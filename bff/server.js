@@ -92,6 +92,8 @@ Issuer.discover(pingIssuerUrl)
 
     // --- Express Routes ---
 
+    const requestedScopes = ['openid', 'profile', 'email']; // Define scopes centrally
+
     // Login route: Serves a confirmation page
     app.get('/login', (req, res) => {
       const confirmationPageHtml = `
@@ -106,6 +108,7 @@ Issuer.discover(pingIssuerUrl)
             .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; }
             h1 { color: #333; }
             p { color: #555; margin-bottom: 20px; }
+            .scopes { font-size: 0.9em; color: #666; margin-bottom:25px; }
             .button { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; text-decoration: none; font-size: 16px; cursor: pointer; }
             .button:hover { background-color: #0056b3; }
           </style>
@@ -114,6 +117,7 @@ Issuer.discover(pingIssuerUrl)
           <div class="container">
             <h1>Confirm Login</h1>
             <p>You are about to be redirected to PingFederate to log in.</p>
+            <p class="scopes">This application will request access to the following information: <strong>${requestedScopes.join(', ')}</strong>.</p>
             <form action="/initiate-ping-login" method="GET">
               <button type="submit" class="button">Proceed to PingFederate</button>
             </form>
@@ -135,7 +139,7 @@ Issuer.discover(pingIssuerUrl)
       req.session.oidcState = state; // Store state in session to verify on callback
 
       const authUrl = oidcClient.authorizationUrl({
-        scope: 'openid profile email', // Adjust scopes as needed
+        scope: requestedScopes.join(' '), // Use the centrally defined scopes, space-separated
         state: state,
       });
       console.log(`Redirecting to PingFederate for login via /initiate-ping-login: ${authUrl}`);
