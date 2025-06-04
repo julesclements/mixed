@@ -1,17 +1,96 @@
+/* client/style.css */
+
 body {
     font-family: sans-serif;
-    margin: 20px;
+    display: flex; /* Helps in centering the .app-container if its height is less than 100vh */
+    flex-direction: column; /* Stack elements vertically */
+    align-items: center; /* Center .app-container horizontally */
+    justify-content: flex-start; /* Align .app-container to the top, add padding for spacing */
+    min-height: 100vh; /* Ensure body takes at least full viewport height */
+    margin: 0;
     background-color: #f4f4f4;
     color: #333;
+    padding-top: 50px; /* Add some space at the top */
+    box-sizing: border-box; /* Include padding and border in the element's total width and height */
+}
+
+.app-container {
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    text-align: center;
+    width: 90%; /* Responsive width */
+    max-width: 500px; /* Max width for larger screens */
+    /* margin: auto; Removed as body flex properties handle centering */
 }
 
 h1 {
     color: #333;
+    margin-bottom: 25px; /* Add some space below heading */
 }
 
-#app {
-    background-color: #fff;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+/* Styling for the div containing buttons */
+.app-container > div:first-of-type { /* Targets the div wrapping buttons */
+    margin-bottom: 20px;
+}
+
+button { /* General button styling, will be overridden by specific IDs if needed but good for consistency */
+    background-color: #28a745; /* Green */
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    text-decoration: none;
+    font-size: 16px;
+    cursor: pointer;
+    margin: 5px; /* Margin between buttons */
+    transition: background-color 0.3s ease; /* Smooth transition for hover */
+}
+
+button:hover {
+    background-color: #218838; /* Darker green */
+}
+
+/* Specific IDs if ever needed, but general button styling should cover them */
+/* #loginButton, #fetchUserButton, #logoutButton {} */
+
+#userInfo {
+    color: #555;
+    margin-bottom: 20px;
+    padding: 10px;
+    border-radius: 4px;
+    background-color: #f9f9f9; /* Light background for user info display */
+    border: 1px solid #eee;
+    min-height: 50px; /* Ensure it has some height even when empty */
+    word-wrap: break-word; /* Prevent long strings from breaking layout */
+}
+
+#userInfo h3 {
+    margin-top: 0;
+    color: #333;
+}
+
+#userInfo pre {
+    text-align: left;
+    white-space: pre-wrap; /* Wrap long lines in preformatted text */
+    background-color: #efefef;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+
+#errorMessage {
+    color: #D8000C; /* Standard error red color */
+    background-color: #FFD2D2; /* Light red background for errors */
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    border: 1px solid #FFBABA;
+    min-height: 20px; /* Ensure it has some height even when empty */
+}
+
+/* Hide error message div if it's empty */
+#errorMessage:empty {
+    display: none;
 }
