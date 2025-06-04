@@ -1,0 +1,8 @@
+package.json.tmp
+
+.vs
+.vscode
+node_modules
+
+.parcel-cache
+docs
