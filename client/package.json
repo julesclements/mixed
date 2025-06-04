@@ -1,0 +1,15 @@
+{
+  "name": "ping-auth-gh-pages-example",
+  "version": "1.0.0",
+  "description": "Example Javascript app with PingFederate authentication and GitHub Pages deployment.",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "parcel build index.html --dist-dir docs --public-url ./"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "parcel": "^2.9.3",
+    "process": "^0.11.10"
+  }
+}
