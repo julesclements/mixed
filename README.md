@@ -12,7 +12,13 @@ The repository is structured as a monorepo:
 1. User clicks "Login" on Client App.
    Client (Browser)  ---- Redirect to /login ----> BFF (Node.js/Express)
 
-2. BFF initiates OIDC flow.
+2. BFF's /login route serves an HTML confirmation page.
+   User sees "Confirm Login" page in browser.
+
+3. User clicks "Proceed to PingFederate" on confirmation page.
+   Browser  ---- GET request to /initiate-ping-login ----> BFF
+
+4. BFF's /initiate-ping-login route initiates OIDC flow.
    BFF (Node.js/Express) -- Redirect to PingFederate --> PingFederate Auth Server
 
 3. User authenticates with PingFederate.
@@ -21,27 +27,27 @@ The repository is structured as a monorepo:
 4. PingFederate redirects back to BFF with authorization code.
    PingFederate Auth Server -- Redirect with code --> BFF (/auth/callback)
 
-5. BFF exchanges code for tokens, stores them in session, sets session cookie.
+6. BFF exchanges code for tokens, stores them in session, sets session cookie.
    BFF <---- OIDC Callback ---- PingFederate Auth Server
    BFF ---- Sets HTTP-Only Session Cookie ----> Client (Browser)
 
-6. BFF redirects user back to Client App.
+7. BFF redirects user back to Client App.
    BFF ---- Redirect ----> Client (Browser)
 
-7. Client requests user data from BFF.
+8. Client requests user data from BFF.
    Client (Browser) ---- GET /api/user (with session cookie) ----> BFF
 
-8. BFF validates session, returns user data.
+9. BFF validates session, returns user data.
    BFF ---- Returns User JSON ----> Client (Browser)
 
-9. User clicks "Logout" on Client App.
-   Client (Browser) ---- Redirect to /logout ----> BFF
+10. User clicks "Logout" on Client App.
+    Client (Browser) ---- Redirect to /logout ----> BFF
 
-10. BFF clears local session, initiates OIDC logout.
-    BFF ---- Redirect to PingFederate SLO ----> PingFederate Auth Server
+11. BFF clears local session, initiates OIDC logout.
+     BFF ---- Redirect to PingFederate SLO ----> PingFederate Auth Server
 
-11. PingFederate logs out user, redirects back to Client App (via BFF's post_logout_redirect_uri).
-    PingFederate Auth Server ---- Redirect ----> Client (Browser)
+12. PingFederate logs out user, redirects back to Client App (via BFF's post_logout_redirect_uri).
+     PingFederate Auth Server ---- Redirect ----> Client (Browser)
 ```
 
 ## Prerequisites
@@ -82,6 +88,8 @@ The BFF handles the OIDC interaction with PingFederate and manages the user's se
     *   `BFF_BASE_URL`: The base URL where the BFF itself is running. This is crucial for constructing the `redirect_uri` that PingFederate will use.
         *   For local development: `http://localhost:3001` (or whatever `BFF_PORT` is).
         *   For production: `https://mixed.hdc.company` (this is the public URL of your deployed BFF).
+    *   `ALLOW_SELF_SIGNED_CERTS`: Set to `true` **only** during local development if your PingFederate instance uses self-signed SSL certificates. This bypasses certificate validation for OIDC communication.
+        *   **SECURITY WARNING:** DO NOT set this to `true` in any production or publicly accessible environment, as it exposes the application to man-in-the-middle attacks.
     *   **IMPORTANT OIDC Redirect URI Configuration:** When deploying your BFF to production at `https://mixed.hdc.company`, its OIDC redirect URI will be `https://mixed.hdc.company/auth/callback`. You **MUST** add this exact URI to the list of allowed redirect URIs in your OIDC client configuration within the PingFederate administration console. Failure to do so will result in PingFederate blocking authentication attempts.
 
 3.  **Install Dependencies:**

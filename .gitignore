@@ -1,7 +1,0 @@
-node_modules
-
-.vs
-.vscode
-
-.parcel-cache
-/client/docs

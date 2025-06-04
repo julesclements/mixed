@@ -3,7 +3,8 @@ require('dotenv').config();
 
 const express = require('express');
 const session = require('express-session');
-const { Issuer, Strategy } = require('openid-client');
+const { Issuer, Strategy, custom } = require('openid-client'); // Import 'custom'
+const https = require('https'); // Required for custom agent if that path is taken
 
 const app = express();
 const port = process.env.BFF_PORT || 3001;
@@ -16,10 +17,24 @@ const sessionSecret = process.env.SESSION_SECRET;
 const bffBaseUrl = process.env.BFF_BASE_URL || `http://localhost:${port}`;
 const redirectUri = `${bffBaseUrl}/auth/callback`;
 const frontendUrl = process.env.FRONTEND_URL;
+const allowSelfSignedCerts = process.env.ALLOW_SELF_SIGNED_CERTS === 'true';
 
 if (!pingIssuerUrl || !clientId || !clientSecret || !sessionSecret || !frontendUrl || !bffBaseUrl) {
   console.error('Missing critical environment variables. Please check your .env file. Ensure PING_ISSUER_URL, PING_CLIENT_ID, PING_CLIENT_SECRET, SESSION_SECRET, FRONTEND_URL, and BFF_BASE_URL are set.');
   process.exit(1);
+}
+
+// --- OIDC HTTP Options Customization (for self-signed certs in DEV) ---
+if (allowSelfSignedCerts) {
+  console.warn('DEVELOPMENT MODE: Allowing self-signed SSL certificates for OIDC provider. DO NOT USE IN PRODUCTION.');
+  custom.setHttpOptionsDefaults({
+    // timeout: 5000, // Default is 3500, can be overridden if needed
+    rejectUnauthorized: false,
+  });
+  // Note: For some openid-client versions or specific needs, you might need to pass
+  // an https.Agent with rejectUnauthorized: false directly to Issuer.discover
+  // or to the client constructor via clientOptions[custom.http_options].
+  // The custom.setHttpOptionsDefaults is generally the most straightforward for a global effect.
 }
 
 // --- Express Session Setup ---
@@ -37,22 +52,63 @@ app.use(session({
 // --- OIDC Client Setup ---
 let oidcClient;
 
+// Discover issuer (respects custom HTTP options if set globally)
 Issuer.discover(pingIssuerUrl)
   .then(issuer => {
     console.log(`Discovered issuer ${issuer.issuer}`);
-    oidcClient = new issuer.Client({
+
+    let clientOptions = {
       client_id: clientId,
       client_secret: clientSecret,
       redirect_uris: [redirectUri],
       response_types: ['code'],
-    });
+    };
+
+    // While custom.setHttpOptionsDefaults should cover client requests too,
+    // if more specific control per client instance were needed (e.g. different agents),
+    // one could set clientOptions[custom.http_options] here.
+    // For this case, global setting is preferred.
+
+    oidcClient = new issuer.Client(clientOptions);
 
     // --- Express Routes ---
 
-    // Login route: Initiates OIDC flow
-    app.get('/login', (req, res, next) => {
+    // Login route: Serves a confirmation page
+    app.get('/login', (req, res) => {
+      const confirmationPageHtml = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Confirm Login</title>
+          <style>
+            body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f4f4f4; color: #333; }
+            .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; }
+            h1 { color: #333; }
+            p { color: #555; margin-bottom: 20px; }
+            .button { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; text-decoration: none; font-size: 16px; cursor: pointer; }
+            .button:hover { background-color: #0056b3; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>Confirm Login</h1>
+            <p>You are about to be redirected to PingFederate to log in.</p>
+            <form action="/initiate-ping-login" method="GET">
+              <button type="submit" class="button">Proceed to PingFederate</button>
+            </form>
+          </div>
+        </body>
+        </html>
+      `;
+      res.send(confirmationPageHtml);
+    });
+
+    // New route to actually initiate OIDC login and redirect to PingFederate
+    app.get('/initiate-ping-login', (req, res, next) => {
       if (!oidcClient) {
-        console.error('OIDC client not initialized at /login');
+        console.error('OIDC client not initialized at /initiate-ping-login');
         return next(new Error('OIDC client not initialized. Please check server logs.'));
       }
       // Add a state parameter for CSRF protection
@@ -63,7 +119,7 @@ Issuer.discover(pingIssuerUrl)
         scope: 'openid profile email', // Adjust scopes as needed
         state: state,
       });
-      console.log(`Redirecting to PingFederate for login: ${authUrl}`);
+      console.log(`Redirecting to PingFederate for login via /initiate-ping-login: ${authUrl}`);
       res.redirect(authUrl);
     });
 
