@@ -6,3 +6,6 @@ node_modules
 
 .parcel-cache
 docs
+
+.env
+.env.local
