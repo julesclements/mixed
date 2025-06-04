@@ -3,8 +3,8 @@ require('dotenv').config();
 
 const express = require('express');
 const session = require('express-session');
-const { Issuer, Strategy, custom } = require('openid-client'); // Import 'custom'
-const https = require('https'); // Required for custom agent if that path is taken
+const { Issuer, custom } = require('openid-client'); // Ensure 'custom' is imported
+const https = require('https'); // Required for custom agent
 
 const app = express();
 const port = process.env.BFF_PORT || 3001;
@@ -25,16 +25,17 @@ if (!pingIssuerUrl || !clientId || !clientSecret || !sessionSecret || !frontendU
 }
 
 // --- OIDC HTTP Options Customization (for self-signed certs in DEV) ---
+let customAgent;
 if (allowSelfSignedCerts) {
   console.warn('DEVELOPMENT MODE: Allowing self-signed SSL certificates for OIDC provider. DO NOT USE IN PRODUCTION.');
+  customAgent = new https.Agent({ rejectUnauthorized: false });
+
+  // Set defaults for all openid-client requests, including those made by the client instance later
   custom.setHttpOptionsDefaults({
-    // timeout: 5000, // Default is 3500, can be overridden if needed
-    rejectUnauthorized: false,
+    agent: customAgent,
+    timeout: 5000, // Example: ensure timeout is explicitly set or keep default
+    // rejectUnauthorized: false is implicitly handled by the agent
   });
-  // Note: For some openid-client versions or specific needs, you might need to pass
-  // an https.Agent with rejectUnauthorized: false directly to Issuer.discover
-  // or to the client constructor via clientOptions[custom.http_options].
-  // The custom.setHttpOptionsDefaults is generally the most straightforward for a global effect.
 }
 
 // --- Express Session Setup ---
@@ -52,9 +53,24 @@ app.use(session({
 // --- OIDC Client Setup ---
 let oidcClient;
 
-// Discover issuer (respects custom HTTP options if set globally)
+// Store original http_options if any, to restore later.
+const originalHttpOptions = Issuer[custom.http_options];
+
+if (allowSelfSignedCerts && customAgent) {
+  // Temporarily override http_options for Issuer for the .discover() call
+  // This is a more direct intervention for the discovery step if global defaults are not picked up.
+  Issuer[custom.http_options] = (options) => ({
+    ...options,
+    agent: customAgent, // Ensure discovery uses the custom agent
+  });
+}
+
 Issuer.discover(pingIssuerUrl)
   .then(issuer => {
+    if (allowSelfSignedCerts) {
+      // Restore original http_options on Issuer after discover has used the override
+      Issuer[custom.http_options] = originalHttpOptions;
+    }
     console.log(`Discovered issuer ${issuer.issuer}`);
 
     let clientOptions = {
@@ -64,10 +80,13 @@ Issuer.discover(pingIssuerUrl)
       response_types: ['code'],
     };
 
-    // While custom.setHttpOptionsDefaults should cover client requests too,
-    // if more specific control per client instance were needed (e.g. different agents),
-    // one could set clientOptions[custom.http_options] here.
-    // For this case, global setting is preferred.
+    // The custom.setHttpOptionsDefaults should ensure that the oidcClient
+    // instance also uses the customAgent for its requests (token, userinfo, etc.)
+    // because it modifies the default request options used by openid-client's internal request utility.
+    // If it didn't, we would need to pass agent options here too:
+    // if (allowSelfSignedCerts && customAgent) {
+    //   clientOptions[custom.http_options] = (options) => ({ ...options, agent: customAgent });
+    // }
 
     oidcClient = new issuer.Client(clientOptions);
 
@@ -206,6 +225,15 @@ Issuer.discover(pingIssuerUrl)
 
   })
   .catch(err => {
+    if (allowSelfSignedCerts) {
+      // Restore original http_options in case of error during discover too
+      Issuer[custom.http_options] = originalHttpOptions;
+    }
     console.error('Failed to discover OIDC issuer or other critical OIDC setup error:', err.message, err.stack);
+    if ((err.message.includes('self-signed certificate') || err.message.includes('unable to verify the first certificate')) && allowSelfSignedCerts) {
+        console.error('Self-signed certificate error occurred despite ALLOW_SELF_SIGNED_CERTS=true. The http_options override for Issuer.discover or global customAgent setting might not be effective, or there could be other SSL/TLS issues.');
+    } else if (err.message.includes('self-signed certificate') || err.message.includes('unable to verify the first certificate')) {
+        console.error('Self-signed certificate error. If this is a development environment with a self-signed cert on PingFederate, set ALLOW_SELF_SIGNED_CERTS=true in your .env file.');
+    }
     process.exit(1);
   });
