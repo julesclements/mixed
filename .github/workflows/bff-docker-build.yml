@@ -1,0 +1,43 @@
+name: Build and Push BFF Docker Image
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'bff/**'
+      - '.github/workflows/bff-docker-build.yml'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # Needed to checkout the code
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./bff # Path to the directory containing the Dockerfile and BFF code
+          file: ./bff/Dockerfile # Explicit path to the Dockerfile
+          push: true # Actually push the image
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/ping-bff:latest # Replace with your desired image name and tag
+          # Example with multiple tags (e.g., latest and git sha):
+          # tags: |
+          #   ${{ secrets.DOCKERHUB_USERNAME }}/ping-bff:latest
+          #   ${{ secrets.DOCKERHUB_USERNAME }}/ping-bff:${{ github.sha }}
+          # cache-from: type=gha
+          # cache-to: type=gha,mode=max

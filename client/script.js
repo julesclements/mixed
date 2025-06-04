@@ -6,9 +6,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const userInfoDiv = document.getElementById('userInfo');
     const errorMessageDiv = document.getElementById('errorMessage');
 
-    // BFF base URL - empty for same-origin, or set for local dev if BFF is on a different port
-    // For a real deployment, this might be configured based on environment
-    const bffBaseUrl = ''; // Assuming BFF is on the same origin or proxied
+    // Dynamically determine BFF base URL
+    let bffBaseUrl = ''; // Default to same-origin
+    const hostname = window.location.hostname;
+
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        bffBaseUrl = 'http://localhost:3001';
+    } else if (hostname === 'julesclements.github.io') {
+        // This should be your deployed BFF URL, which might be different from PingFederate's URL.
+        // For this example, assuming the BFF is deployed at 'https://ping.hdc.company'
+        // if the client is on 'julesclements.github.io'.
+        // IMPORTANT: Replace with your actual deployed BFF URL.
+        bffBaseUrl = 'https://ping.hdc.company';
+    }
+    // For any other hostname, bffBaseUrl remains '', implying same-origin.
+
+    console.log(`Client hostname: ${hostname}, BFF Base URL set to: ${bffBaseUrl}`);
 
     const fetchUser = async () => {
         try {
