@@ -12,16 +12,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
         bffBaseUrl = 'http://localhost:3001';
+        console.log('Client running locally, BFF assumed at:', bffBaseUrl);
     } else if (hostname === 'julesclements.github.io') {
-        // This should be your deployed BFF URL, which might be different from PingFederate's URL.
-        // For this example, assuming the BFF is deployed at 'https://ping.hdc.company'
-        // if the client is on 'julesclements.github.io'.
-        // IMPORTANT: Replace with your actual deployed BFF URL.
-        bffBaseUrl = 'https://ping.hdc.company';
+        bffBaseUrl = 'https://mixed.hdc.company'; // New BFF Production URL
+        console.log('Client running on GitHub Pages, BFF set to:', bffBaseUrl);
+    } else {
+        bffBaseUrl = ''; // Default for other cases
+        console.log('Client running on other hostname, BFF assumed same-origin or proxied.');
     }
-    // For any other hostname, bffBaseUrl remains '', implying same-origin.
-
-    console.log(`Client hostname: ${hostname}, BFF Base URL set to: ${bffBaseUrl}`);
 
     const fetchUser = async () => {
         try {
@@ -87,5 +85,5 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Initial state: Check authentication status by trying to fetch user info
-    fetchUser();
+    // fetchUser(); // Call is now only manual via button. User must click "Get User Info".
 });

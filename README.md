@@ -81,7 +81,8 @@ The BFF handles the OIDC interaction with PingFederate and manages the user's se
         *   For testing against a deployed client: Your GitHub Pages URL (e.g., `https://julesclements.github.io/mixed/`).
     *   `BFF_BASE_URL`: The base URL where the BFF itself is running. This is crucial for constructing the `redirect_uri` that PingFederate will use.
         *   For local development: `http://localhost:3001` (or whatever `BFF_PORT` is).
-        *   For production: The public URL of your deployed BFF.
+        *   For production: `https://mixed.hdc.company` (this is the public URL of your deployed BFF).
+    *   **IMPORTANT OIDC Redirect URI Configuration:** When deploying your BFF to production at `https://mixed.hdc.company`, its OIDC redirect URI will be `https://mixed.hdc.company/auth/callback`. You **MUST** add this exact URI to the list of allowed redirect URIs in your OIDC client configuration within the PingFederate administration console. Failure to do so will result in PingFederate blocking authentication attempts.
 
 3.  **Install Dependencies:**
     ```bash
@@ -139,7 +140,7 @@ The client is a static Javascript application that makes API calls to the BFF.
 4.  **`bffBaseUrl` in `client/script.js`:**
     The `client/script.js` file dynamically determines the `bffBaseUrl` (the URL for your BFF):
     *   If the client is accessed via `localhost` or `127.0.0.1` (local development), it automatically sets `bffBaseUrl` to `http://localhost:3001` (assuming your BFF is running locally on port 3001).
-    *   If the client is accessed via `julesclements.github.io` (the deployed GitHub Pages site), it sets `bffBaseUrl` to `https://ping.hdc.company`. **Important:** This URL (`https://ping.hdc.company`) is a placeholder and **must be replaced** with the actual public URL where your BFF is deployed and accessible from the internet (e.g., the URL of your reverse proxy or deployed BFF container).
+    *   If the client is accessed via `julesclements.github.io` (the deployed GitHub Pages site), it sets `bffBaseUrl` to `https://mixed.hdc.company`. This should match the public URL where your BFF is deployed.
     *   For other hostnames, it defaults to an empty string (`''`), implying the BFF is at the same origin as the client (less common for this setup).
 
 ## Deployment
@@ -163,4 +164,4 @@ The client is a static Javascript application that makes API calls to the BFF.
     *   **HTTPS termination:** Ensuring your BFF is served over HTTPS.
     *   **Custom domain names.**
     *   Potentially routing, rate limiting, etc.
-    *   The `BFF_BASE_URL` environment variable for your deployed BFF should be its public HTTPS URL provided by the reverse proxy.
+    *   The `BFF_BASE_URL` environment variable for your deployed BFF should be its public HTTPS URL provided by the reverse proxy (e.g., `https://mixed.hdc.company`).
