@@ -47,6 +47,7 @@ const corsOptions = {
   credentials: true,    // Allow cookies to be sent across origins
 };
 app.use(cors(corsOptions)); // Enable CORS with options
+app.use(express.json()); // Middleware to parse JSON bodies
 
 const isProduction = process.env.NODE_ENV === 'production';
 if (isProduction) {
@@ -224,7 +225,7 @@ Issuer.discover(pingIssuerUrl)
       }
     });
 
-    // API User route: Returns user info if authenticated
+    // New route to perform token exchange
     app.get('/exchange-code', async (req, res, next) => {
       if (!oidcClient) {
         console.error('OIDC client not initialized at /exchange-code');
@@ -259,11 +260,53 @@ Issuer.discover(pingIssuerUrl)
       }
     });
 
+    // API User route: Returns user info, ID token, and access token if authenticated
+    app.post('/api/introspect-token', async (req, res, next) => {
+      if (!oidcClient) {
+        console.error('OIDC client not initialized at /api/introspect-token');
+        return next(new Error('OIDC client not initialized.'));
+      }
+      if (!req.session.tokenSet) { // Check for active BFF session providing the tokens
+        return res.status(401).json({ error: 'User not authenticated in BFF. Please login first to obtain tokens.' });
+      }
+
+      const tokenToIntrospect = req.body.token_to_introspect; // Expecting this in the POST body
+
+      if (!tokenToIntrospect || typeof tokenToIntrospect !== 'string') {
+        return res.status(400).json({ error: 'token_to_introspect is required in the request body and must be a string.' });
+      }
+
+      try {
+        console.log(`Introspecting token (first 20 chars): ${tokenToIntrospect.substring(0, 20)}...`);
+        // Use the access_token from the user's session for authentication at introspection endpoint,
+        // if PingFederate introspection endpoint requires client authentication or specific token types.
+        // Here, we assume the client is configured to introspect any token it has client_id/secret for.
+        // If the token being introspected is the session's access_token, that's fine.
+        // If it's another token, the client's ability to introspect depends on PingFederate config.
+        const introspectionResult = await oidcClient.introspect(tokenToIntrospect);
+
+        res.json(introspectionResult);
+      } catch (err) {
+        console.error('Error during token introspection:', err.message, err.stack);
+        let errorResponse = { error: 'Token introspection failed.', message: err.message };
+        if (err.data) {
+          errorResponse.details = err.data; // err.data often contains the body from the IDP error response
+        }
+        res.status(err.statusCode || 500).json(errorResponse);
+      }
+    });
+
     app.get('/api/user', (req, res) => {
-      if (req.session.userInfo) {
-        res.json(req.session.userInfo);
+      if (req.session.userInfo && req.session.tokenSet) { // Ensure both userInfo and tokenSet exist
+        res.json({
+          message: "User is authenticated. Token details below.",
+          id_token: req.session.tokenSet.id_token,
+          access_token: req.session.tokenSet.access_token,
+          claims: req.session.userInfo // This is req.session.tokenSet.claims()
+        });
       } else {
-        res.status(401).json({ error: 'User not authenticated. Please login.' });
+        // If either is missing, consider the user not fully authenticated in the context of this API
+        res.status(401).json({ error: 'User not authenticated or session is incomplete. Please login.' });
       }
     });
 

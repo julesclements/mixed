@@ -200,3 +200,52 @@ The client is a static Javascript application that makes API calls to the BFF.
     *   **Custom domain names.**
     *   Potentially routing, rate limiting, etc.
     *   The `BFF_BASE_URL` environment variable for your deployed BFF should be its public HTTPS URL provided by the reverse proxy (e.g., `https://mixed.hdc.company`).
+
+### BFF API Endpoints
+
+The BFF exposes the following API endpoints that the client interacts with (after the OIDC login/callback flow which also uses BFF routes like `/login`, `/initiate-ping-login`, `/auth/callback`, `/exchange-code`):
+
+*   **`GET /api/user`**
+    *   **Purpose:** Retrieves information about the currently authenticated user, including ID token, access token, and claims.
+    *   **Authentication:** Requires an active BFF session (session cookie).
+    *   **Response:**
+        ```json
+        {
+          "message": "User is authenticated. Token details below.",
+          "id_token": "raw_id_token_string",
+          "access_token": "raw_access_token_string",
+          "claims": { /* user claims object */ }
+        }
+        ```
+    *   Returns a 401 error if the user is not authenticated or the session is incomplete.
+
+*   **`POST /api/introspect-token`**
+    *   **Purpose:** Allows introspection of a provided token (typically an access token) via the PingFederate introspection endpoint.
+    *   **Authentication:** Requires an active BFF session. The BFF uses its OIDC client credentials to communicate with the introspection endpoint.
+    *   **Request Body (JSON):**
+        ```json
+        {
+          "token_to_introspect": "your_access_token_string"
+        }
+        ```
+    *   **Response:** Returns the JSON response directly from PingFederate's introspection endpoint. This typically includes an `active: true/false` field and other metadata about the token if it's valid and active.
+    *   Returns appropriate error responses (400, 401, 500) if the request is invalid, the user is not authenticated with the BFF, or introspection fails.
+
+### Client Application Features
+*   **Login/Logout:** Initiates OIDC authentication flow via the BFF. This involves:
+    1. Redirect to BFF's `/login` (shows confirmation page).
+    2. User confirms, browser hits BFF's `/initiate-ping-login` (redirects to PingFederate).
+    3. After PingFederate auth, redirect to BFF's `/auth/callback` (shows auth code).
+    4. User confirms, browser hits BFF's `/exchange-code` (BFF exchanges code for tokens, sets session, redirects to client).
+*   **Fetch User Info:** After login, clicking "Get User Info" (after a confirmation dialog) calls the BFF's `/api/user` endpoint. The displayed information includes:
+    *   ID Token Claims (as validated and provided by the BFF).
+    *   Client-side decoded payload of the ID Token.
+    *   Client-side decoded payload of the Access Token (if it's a JWT and parseable). If the Access Token is opaque or not a JWT, the raw token is shown.
+    *   The raw ID Token string.
+    *   The raw Access Token string.
+*   **Introspect Access Token (Conditional):**
+    *   If, after fetching user info, the Access Token is found to be opaque (i.e., not a client-decodable JWT), an "Introspect Access Token" button will appear.
+    *   Clicking this button sends the Access Token to the BFF's `/api/introspect-token` endpoint.
+    *   The JSON introspection result from the BFF (which it gets from PingFederate) is then displayed in a dedicated section on the client page.
+    *   This feature is primarily for demonstration and development purposes to understand the details of opaque access tokens.
+*   **Security Note on Client-Side Token Decoding:** The client-side decoding of JWTs (ID Token, Access Token) is **for display and informational purposes only**. The client **must not** use any information decoded from these tokens to make security decisions or to grant access to resources. All token validation (signatures, expiry, claims) and authorization decisions are the responsibility of the Backend-for-Frontend (BFF).
