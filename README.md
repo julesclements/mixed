@@ -27,27 +27,33 @@ The repository is structured as a monorepo:
 4. PingFederate redirects back to BFF with authorization code.
    PingFederate Auth Server -- Redirect with code --> BFF (/auth/callback)
 
-6. BFF exchanges code for tokens, stores them in session, sets session cookie.
-   BFF <---- OIDC Callback ---- PingFederate Auth Server
+6. BFF's /auth/callback route validates state, then displays an HTML page showing the authorization code.
+   User sees "Authorization Code Received" page in browser.
+
+7. User clicks "Exchange Code & Proceed" on this page.
+   Browser  ---- GET request to /exchange-code ----> BFF
+
+8. BFF's /exchange-code route exchanges the code (retrieved from session) for tokens, stores tokens and user info in session, sets session cookie.
+   BFF <---- OIDC Token Exchange ---- PingFederate Auth Server
    BFF ---- Sets HTTP-Only Session Cookie ----> Client (Browser)
 
-7. BFF redirects user back to Client App.
+9. BFF redirects user back to Client App.
    BFF ---- Redirect ----> Client (Browser)
 
-8. Client requests user data from BFF.
+10. Client requests user data from BFF.
    Client (Browser) ---- GET /api/user (with session cookie) ----> BFF
 
 9. BFF validates session, returns user data.
    BFF ---- Returns User JSON ----> Client (Browser)
 
-10. User clicks "Logout" on Client App.
-    Client (Browser) ---- Redirect to /logout ----> BFF
+11. User clicks "Logout" on Client App.
+     Client (Browser) ---- Redirect to /logout ----> BFF
 
-11. BFF clears local session, initiates OIDC logout.
-     BFF ---- Redirect to PingFederate SLO ----> PingFederate Auth Server
+12. BFF clears local session, initiates OIDC logout.
+      BFF ---- Redirect to PingFederate SLO ----> PingFederate Auth Server
 
-12. PingFederate logs out user, redirects back to Client App (via BFF's post_logout_redirect_uri).
-     PingFederate Auth Server ---- Redirect ----> Client (Browser)
+13. PingFederate logs out user, redirects back to Client App (via BFF's post_logout_redirect_uri).
+      PingFederate Auth Server ---- Redirect ----> Client (Browser)
 ```
 
 ## Prerequisites
@@ -64,7 +70,8 @@ The repository is structured as a monorepo:
 
 ## BFF Setup (`/bff` directory)
 
-The BFF handles the OIDC interaction with PingFederate and manages the user's session.
+The BFF handles the OIDC interaction with PingFederate, manages the user's session, and serves user data to the client.
+It uses `express-session` for session management and `openid-client` for OIDC interactions.
 
 1.  **Navigate to the BFF directory:**
     ```bash
@@ -107,6 +114,11 @@ The BFF handles the OIDC interaction with PingFederate and manages the user's se
         npm run dev
         ```
         If you don't have `nodemon` installed globally, you can install it as a dev dependency (`npm install -D nodemon`) or run with `npx nodemon server.js`.
+
+5.  **CORS Configuration:**
+    *   The BFF uses the `cors` package to handle Cross-Origin Resource Sharing.
+    *   This is essential for local development when the client (e.g., Parcel dev server on `http://localhost:1234`) and the BFF (on `http://localhost:3001`) operate on different ports (and thus different origins).
+    *   The CORS policy is configured in `bff/server.js` to allow requests specifically from the `FRONTEND_URL` (defined in your `bff/.env` file) and to allow credentials (e.g., cookies) to be sent and received. This ensures that the client can make authenticated API calls to the BFF.
 
 ## Client Setup (`/client` directory)
 
