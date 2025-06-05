@@ -317,4 +317,10 @@ The BFF exposes the following API endpoints that the client interacts with (afte
     *   Clicking this button sends the Access Token to the BFF's `/api/introspect-token` endpoint.
     *   The JSON introspection result from the BFF (which it gets from PingFederate) is then displayed in a dedicated section on the client page.
     *   This feature is primarily for demonstration and development purposes to understand the details of opaque access tokens.
+*   **X-Correlation-ID Handling (Client-Side):**
+    *   The client application (`client/script.js`) generates a UUID v4 as an `X-Correlation-ID` to help trace a user's interaction journey.
+    *   This ID is passed as a query parameter to the BFF's `/login` route and subsequently sent as an `X-Correlation-ID` header in API calls to `/api/user` and `/api/introspect-token`.
+    *   To maintain consistency across page loads and redirects during a single user journey (e.g., after being redirected back from the BFF), the `X-Correlation-ID` is persisted in the browser's `sessionStorage`.
+    *   A new ID is generated when the user explicitly initiates a new login, or if no ID is found in `sessionStorage` when an action requiring an ID (like "Get User Info") is performed.
+    *   The ID is cleared from `sessionStorage` when the user logs out.
 *   **Security Note on Client-Side Token Decoding:** The client-side decoding of JWTs (ID Token, Access Token) is **for display and informational purposes only**. The client **must not** use any information decoded from these tokens to make security decisions or to grant access to resources. All token validation (signatures, expiry, claims) and authorization decisions are the responsibility of the Backend-for-Frontend (BFF).
