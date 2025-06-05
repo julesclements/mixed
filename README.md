@@ -211,6 +211,65 @@ The client is a static Javascript application that makes API calls to the BFF.
     *   Potentially routing, rate limiting, etc.
     *   The `BFF_BASE_URL` environment variable for your deployed BFF should be its public HTTPS URL provided by the reverse proxy (e.g., `https://mixed.hdc.company`).
 
+## Production Troubleshooting / Considerations
+
+This section addresses common issues encountered when deploying the client and BFF to production, especially when they reside on different domains.
+
+### Symptom: 401 Unauthorized on `/api/user` after successful login
+
+*   **Description:** You have successfully logged in via PingFederate. The BFF redirects you back to the client application (e.g., on `https://julesclements.github.io/mixed/`). However, when you click "Get User Info" (or if the client automatically tries to fetch user data), the call to the BFF's `/api/user` endpoint (e.g., at `https://mixed.hdc.company/api/user`) fails with a 401 Unauthorized error. The client application might display "Please login to view user information."
+*   **Likely Cause (Cross-Site Cookies / Third-Party Cookie Restrictions):** This is often due to how modern browsers handle cookies when the frontend (client) and backend (BFF) are on different top-level domains (e.g., `github.io` vs. `hdc.company`). The BFF's session cookie (e.g., `connect.sid`) might be treated as a "third-party cookie" by the browser when the client makes requests from its domain to the BFF's domain. Browsers are increasingly restricting the sending of third-party cookies by default to enhance user privacy (e.g., Chrome's Privacy Sandbox initiative, Safari's Intelligent Tracking Prevention (ITP), Firefox's Enhanced Tracking Protection (ETP)).
+
+### Diagnosing the Issue
+
+1.  **Verify BFF Configuration for Production:**
+    *   Ensure `NODE_ENV` is set to `production` for your deployed BFF instance.
+    *   The session cookie settings in `bff/server.js` should then be active:
+        *   `cookie.secure: true` (cookie is only sent over HTTPS).
+        *   `cookie.sameSite: 'None'` (this is necessary for cross-site cookie delivery, but requires `secure: true`).
+    *   If your BFF is behind a reverse proxy that terminates TLS (handles HTTPS), ensure `app.set('trust proxy', 1);` is active in `bff/server.js` so Express correctly identifies the connection as secure.
+    *   The BFF **must be served over HTTPS**.
+
+2.  **Use Browser Developer Tools:**
+    *   **After Login (on the client page, e.g., `https://julesclements.github.io/mixed/`):**
+        1.  Open your browser's Developer Tools.
+        2.  Go to the "Application" (Chrome/Edge) or "Storage" (Firefox) tab.
+        3.  Under "Cookies", find the section for your BFF's domain (e.g., `https://mixed.hdc.company`).
+        4.  **Verify the Session Cookie:** Look for the session cookie (its name is typically `connect.sid` for `express-session`).
+            *   Confirm it exists.
+            *   Check its attributes: `Secure` should be checked (true), `SameSite` should be `None`.
+            *   Note its `Domain` attribute.
+    *   **When "Get User Info" is Clicked (triggering the `/api/user` call):**
+        1.  Switch to the "Network" tab in Developer Tools.
+        2.  Trigger the `/api/user` request (e.g., by clicking the "Get User Info" button).
+        3.  Find the request to `/api/user` (e.g., to `https://mixed.hdc.company/api/user`).
+        4.  Select this request and look at the "Request Headers".
+        5.  **Check for the `Cookie` Header:** See if the session cookie (e.g., `connect.sid=...`) was actually sent with this request to the BFF.
+
+### Interpreting Findings & Potential Solutions
+
+*   **If the session cookie is set correctly in the browser (Secure, SameSite=None) but is NOT SENT with the `/api/user` request to the different domain:**
+    *   This strongly indicates that the browser is blocking the cookie due to its third-party cookie policies. The browser sees the request from `julesclements.github.io` to `mixed.hdc.company` as a cross-site request and may prevent the `mixed.hdc.company` cookie from being sent.
+
+*   **Potential Long-Term Solutions (Addressing Third-Party Cookie Restrictions):**
+    *   This is a widespread challenge for web applications. Robust solutions often involve architectural changes:
+        1.  **Align Domains (Same-Site Cookies):** The most effective solution is to host the client application and the BFF under the same parent domain (or subdomains of the same registrable domain). This makes the cookies "first-party" or "same-site."
+            *   Examples:
+                *   Client: `app.yourdomain.com`, BFF: `api.yourdomain.com`
+                *   Client: `www.yourdomain.com/app/`, BFF: `www.yourdomain.com/api/` (if paths are used to differentiate, ensure cookie paths are set correctly).
+                *   For this project: Client on `app.mixed.hdc.company` and BFF on `bff.mixed.hdc.company` (or similar).
+        2.  **Token-Based Authentication for API Calls (Stateless BFF for `/api/user`):**
+            *   Instead of relying on session cookies for API calls from the client to the BFF, the client could store the access token (received via the BFF during login, e.g., from the `/api/user` initial response) in memory.
+            *   The client would then send this access token in the `Authorization: Bearer <token>` header for requests to `/api/user`.
+            *   The BFF's `/api/user` endpoint would need to be modified to validate this Bearer token (e.g., by introspecting it or validating its signature if it's a JWT and the BFF has the keys) instead of relying on its own session.
+            *   This approach makes the specific `/api/user` endpoint stateless from the BFF's session perspective, though the initial OIDC login flow with PingFederate would still use sessions at the BFF.
+            *   This is a more significant refactor of the current BFF's `/api/user` logic.
+    *   **Research Current Best Practices:** Browser policies around third-party cookies are evolving. Keep an eye on:
+        *   **CHIPS (Cookies Having Independent Partitioned State):** This allows cookies to be "partitioned" by the top-level site, potentially allowing them to be sent in some cross-site contexts if marked with the `Partitioned` attribute. Support and implementation details vary by browser.
+        *   Other proposals and standards in the Privacy Sandbox and similar initiatives.
+
+This troubleshooting guide should help in diagnosing and understanding potential production deployment issues related to cross-site cookie handling.
+
 ### BFF API Endpoints
 
 The BFF exposes the following API endpoints that the client interacts with (after the OIDC login/callback flow which also uses BFF routes like `/login`, `/initiate-ping-login`, `/auth/callback`, `/exchange-code`):
