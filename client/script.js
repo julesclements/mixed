@@ -1,13 +1,26 @@
 // client/script.js
+
+// Select DOM elements globally after the document structure is known,
+// but ensure they are only accessed *after* DOMContentLoaded if their state is critical at load.
+// For simple element existence, this is fine. Event listeners will be attached in DOMContentLoaded.
+let loginButton, fetchUserButton, logoutButton, userInfoDiv, errorMessageDiv, introspectionSection;
+let bffBaseUrl = ''; // Default to same-origin, will be set in DOMContentLoaded
+
+// Dynamically determine BFF base URL - this part needs to be inside DOMContentLoaded
+// or called from there, as window.location might not be fully reliable before that for complex scenarios,
+// though for hostname it's usually fine. For safety and consistency, we'll set bffBaseUrl in DOMContentLoaded.
+
 document.addEventListener('DOMContentLoaded', () => {
-    const loginButton = document.getElementById('loginButton');
-    const fetchUserButton = document.getElementById('fetchUserButton');
-    const logoutButton = document.getElementById('logoutButton');
-    const userInfoDiv = document.getElementById('userInfo');
-    const errorMessageDiv = document.getElementById('errorMessage');
+    // Assign elements now that DOM is loaded
+    loginButton = document.getElementById('loginButton');
+    fetchUserButton = document.getElementById('fetchUserButton');
+    logoutButton = document.getElementById('logoutButton');
+    userInfoDiv = document.getElementById('userInfo');
+    errorMessageDiv = document.getElementById('errorMessage');
+    introspectionSection = document.getElementById('introspectionSection');
+
 
     // Dynamically determine BFF base URL
-    let bffBaseUrl = ''; // Default to same-origin
     const hostname = window.location.hostname;
 
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
@@ -165,30 +178,161 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial state: Check authentication status by trying to fetch user info
     // fetchUser(); // Call is now only manual via button. User must click "Get User Info".
+
+    // Initialize UI elements that might be affected by fetchUser status (e.g., clear old messages)
+    if (userInfoDiv) userInfoDiv.innerHTML = '';
+    if (errorMessageDiv) errorMessageDiv.textContent = '';
+    if (introspectionSection) introspectionSection.innerHTML = ''; // Clear any old introspection results/button
+
+    // Show login/fetch buttons by default, hide logout
+    // This might be redundant if fetchUser() on load handles it, but good for clarity if no auto-fetch
+    if (loginButton) loginButton.style.display = 'block';
+    if (fetchUserButton) fetchUserButton.style.display = 'block';
+    if (logoutButton) logoutButton.style.display = 'none';
 });
 
-// Placeholder for the introspection handler function
+// Helper function to decode JWT payload (simplistic, no signature verification)
+function decodeJwtPayload(token) {
+  if (!token || typeof token !== 'string') {
+    return null;
+  }
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      console.warn("Token does not have 3 parts, cannot decode payload.");
+      return null;
+    }
+    const payloadBase64Url = parts[1];
+    const payloadBase64 = payloadBase64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const decodedJson = atob(payloadBase64);
+    return JSON.parse(decodedJson);
+  } catch (e) {
+    console.error("Failed to decode JWT payload:", e);
+    return null;
+  }
+}
+
+// Helper function to escape HTML for displaying raw tokens (basic)
+function escapeHtml(unsafe) {
+    if (typeof unsafe !== 'string') {
+        return '';
+    }
+    return unsafe
+         .replace(/&/g, "&amp;")
+         .replace(/</g, "&lt;")
+         .replace(/>/g, "&gt;")
+         .replace(/"/g, "&quot;")
+         .replace(/'/g, "&#039;");
+}
+
+const fetchUser = async () => {
+    // Ensure elements are available before trying to update them
+    if (!userInfoDiv || !errorMessageDiv || !loginButton || !fetchUserButton || !logoutButton || !introspectionSection) {
+        console.error('Required DOM elements not found in fetchUser.');
+        return;
+    }
+    try {
+        const response = await fetch(`${bffBaseUrl}/api/user`, { credentials: 'include' });
+
+        if (response.ok) { // Status 200-299
+            const data = await response.json();
+
+            const decodedIdToken = decodeJwtPayload(data.id_token);
+            const decodedAccessToken = decodeJwtPayload(data.access_token);
+
+            let userInfoHtml = `<h3>${escapeHtml(data.message) || 'User Information'}</h3>`;
+            userInfoHtml += '<h4>ID Token Claims (from BFF session):</h4>';
+            userInfoHtml += `<pre>${JSON.stringify(data.claims, null, 2)}</pre>`;
+            userInfoHtml += '<h4>Decoded ID Token Payload (client-side decode):</h4>';
+            userInfoHtml += `<pre>${JSON.stringify(decodedIdToken, null, 2)}</pre>`;
+
+            if (decodedAccessToken) {
+              userInfoHtml += '<h4>Decoded Access Token Payload (client-side decode):</h4>';
+              userInfoHtml += `<pre>${JSON.stringify(decodedAccessToken, null, 2)}</pre>`;
+            } else {
+              userInfoHtml += '<h4>Access Token (Opaque or unparseable by client):</h4>';
+              userInfoHtml += `<pre style="word-wrap: break-word; white-space: pre-wrap;">${escapeHtml(data.access_token)}</pre>`;
+            }
+
+            userInfoHtml += '<h4>Raw ID Token:</h4>';
+            userInfoHtml += `<pre style="word-wrap: break-word; white-space: pre-wrap;">${escapeHtml(data.id_token)}</pre>`;
+            userInfoHtml += '<h4>Raw Access Token:</h4>';
+            userInfoHtml += `<pre style="word-wrap: break-word; white-space: pre-wrap;">${escapeHtml(data.access_token)}</pre>`;
+
+            userInfoDiv.innerHTML = userInfoHtml;
+            introspectionSection.innerHTML = ''; // Clear previous button or results
+
+            if (!decodedAccessToken && data.access_token) {
+                const introspectButton = document.createElement('button');
+                introspectButton.id = 'introspectTokenButton';
+                introspectButton.textContent = 'Introspect Access Token';
+                introspectButton.addEventListener('click', () => handleIntrospectionClick(data.access_token));
+                introspectionSection.appendChild(introspectButton);
+            }
+
+            errorMessageDiv.textContent = '';
+            loginButton.style.display = 'none';
+            fetchUserButton.style.display = 'none';
+            logoutButton.style.display = 'block';
+        } else if (response.status === 401) {
+            userInfoDiv.innerHTML = '';
+            introspectionSection.innerHTML = ''; // Clear introspection section on logout/401
+            errorMessageDiv.textContent = 'Please login to view user information.';
+            loginButton.style.display = 'block';
+            fetchUserButton.style.display = 'block';
+            logoutButton.style.display = 'none';
+        } else {
+            const errorText = await response.text();
+            userInfoDiv.innerHTML = '';
+            introspectionSection.innerHTML = '';
+            errorMessageDiv.textContent = `Error fetching user: ${response.status} ${errorText || response.statusText}`;
+            loginButton.style.display = 'block';
+            fetchUserButton.style.display = 'block';
+            logoutButton.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Fetch user error:', error);
+        userInfoDiv.innerHTML = '';
+        introspectionSection.innerHTML = '';
+        errorMessageDiv.textContent = 'Network error or server is unavailable. Please try again later.';
+        loginButton.style.display = 'block';
+        fetchUserButton.style.display = 'block';
+        logoutButton.style.display = 'none';
+    }
+};
+
+const login = () => {
+    console.log('Login button clicked, redirecting to BFF login...');
+    window.location.href = `${bffBaseUrl}/login`;
+};
+
+const logout = () => {
+    window.location.href = `${bffBaseUrl}/logout`;
+};
+
+
+// handleIntrospectionClick function (now can access global errorMessageDiv and bffBaseUrl)
 async function handleIntrospectionClick(accessTokenString) {
   console.log('Introspection requested for token (first 20 chars):', accessTokenString.substring(0, 20) + "...");
 
-  const displayAreaId = 'introspectionDisplayArea';
-  const introspectionSection = document.getElementById('introspectionSection');
-  let displayArea = document.getElementById(displayAreaId); // Attempt to get existing displayArea
+  // Ensure elements are available
+  if (!introspectionSection || !errorMessageDiv) {
+      console.error('Required DOM elements not found in handleIntrospectionClick.');
+      return;
+  }
 
-  // Create display area if it doesn't exist (e.g., first click)
-  // or ensure it's a child of introspectionSection if it was somehow misplaced or not yet added
+  const displayAreaId = 'introspectionDisplayArea';
+  let displayArea = document.getElementById(displayAreaId);
+
   if (!displayArea || !introspectionSection.contains(displayArea)) {
-    if (displayArea) displayArea.remove(); // Remove if it exists but not in correct parent
+    if (displayArea) displayArea.remove();
     displayArea = document.createElement('div');
     displayArea.id = displayAreaId;
-    introspectionSection.appendChild(displayArea); // Append to the dedicated section
+    introspectionSection.appendChild(displayArea);
   }
-  // else { // If it exists, clear previous results before showing "loading"
-  //   displayArea.innerHTML = '';
-  // }
 
-  displayArea.innerHTML = '<p>Introspecting token...</p>'; // Show loading state
-  errorMessageDiv.textContent = ''; // Clear previous global errors (if any were set by this action before)
+  displayArea.innerHTML = '<p>Introspecting token...</p>';
+  errorMessageDiv.textContent = '';
 
   try {
     const response = await fetch(`${bffBaseUrl}/api/introspect-token`, {
