@@ -200,3 +200,13 @@ The client is a static Javascript application that makes API calls to the BFF.
     *   **Custom domain names.**
     *   Potentially routing, rate limiting, etc.
     *   The `BFF_BASE_URL` environment variable for your deployed BFF should be its public HTTPS URL provided by the reverse proxy (e.g., `https://mixed.hdc.company`).
+
+### Client Application Features
+*   **Login/Logout:** Initiates OIDC authentication flow via the BFF.
+*   **Fetch User Info:** After login, retrieves user information from the BFF. The displayed information now includes:
+    *   ID Token Claims (as validated and provided by the BFF).
+    *   Client-side decoded payload of the ID Token (for informational purposes).
+    *   Client-side decoded payload of the Access Token (if it's a JWT and parseable; for informational purposes). If the Access Token is opaque or not a JWT, the raw token is shown.
+    *   The raw ID Token string.
+    *   The raw Access Token string.
+*   **Security Note on Client-Side Token Decoding:** The client-side decoding of JWTs (ID Token, Access Token) is **for display and informational purposes only**. The client **must not** use any information decoded from these tokens to make security decisions or to grant access to resources. All token validation (signatures, expiry, claims) and authorization decisions are the responsibility of the Backend-for-Frontend (BFF).

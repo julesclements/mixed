@@ -224,7 +224,7 @@ Issuer.discover(pingIssuerUrl)
       }
     });
 
-    // API User route: Returns user info if authenticated
+    // New route to perform token exchange
     app.get('/exchange-code', async (req, res, next) => {
       if (!oidcClient) {
         console.error('OIDC client not initialized at /exchange-code');
@@ -259,11 +259,18 @@ Issuer.discover(pingIssuerUrl)
       }
     });
 
+    // API User route: Returns user info, ID token, and access token if authenticated
     app.get('/api/user', (req, res) => {
-      if (req.session.userInfo) {
-        res.json(req.session.userInfo);
+      if (req.session.userInfo && req.session.tokenSet) { // Ensure both userInfo and tokenSet exist
+        res.json({
+          message: "User is authenticated. Token details below.",
+          id_token: req.session.tokenSet.id_token,
+          access_token: req.session.tokenSet.access_token,
+          claims: req.session.userInfo // This is req.session.tokenSet.claims()
+        });
       } else {
-        res.status(401).json({ error: 'User not authenticated. Please login.' });
+        // If either is missing, consider the user not fully authenticated in the context of this API
+        res.status(401).json({ error: 'User not authenticated or session is incomplete. Please login.' });
       }
     });
 

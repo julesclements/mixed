@@ -21,19 +21,80 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Client running on other hostname, BFF assumed same-origin or proxied.');
     }
 
+    // Helper function to decode JWT payload (simplistic, no signature verification)
+    function decodeJwtPayload(token) {
+      if (!token || typeof token !== 'string') {
+        return null;
+      }
+      try {
+        const parts = token.split('.');
+        if (parts.length !== 3) {
+          // Not a standard JWT format (or JWE, which we aren't handling here)
+          console.warn("Token does not have 3 parts, cannot decode payload.");
+          return null;
+        }
+        const payloadBase64Url = parts[1];
+        const payloadBase64 = payloadBase64Url.replace(/-/g, '+').replace(/_/g, '/');
+        // Browsers' atob typically handles padding issues for base64url,
+        // but if not, manual padding might be needed:
+        // const decodedJson = atob(payloadBase64.padEnd(payloadBase64.length + (4 - payloadBase64.length % 4) % 4, '='));
+        const decodedJson = atob(payloadBase64);
+        return JSON.parse(decodedJson);
+      } catch (e) {
+        console.error("Failed to decode JWT payload:", e);
+        return null;
+      }
+    }
+
+    // Helper function to escape HTML for displaying raw tokens (basic)
+    function escapeHtml(unsafe) {
+        if (typeof unsafe !== 'string') {
+            return ''; // Or handle as an error, or return unsafe if it's not a string
+        }
+        return unsafe
+             .replace(/&/g, "&amp;")
+             .replace(/</g, "&lt;")
+             .replace(/>/g, "&gt;")
+             .replace(/"/g, "&quot;")
+             .replace(/'/g, "&#039;");
+    }
+
     const fetchUser = async () => {
         try {
             const response = await fetch(`${bffBaseUrl}/api/user`, { credentials: 'include' });
 
             if (response.ok) { // Status 200-299
-                const userData = await response.json();
-                userInfoDiv.innerHTML = `
-                    <h3>User Information:</h3>
-                    <p><strong>Name:</strong> ${userData.name || userData.sub || 'N/A'}</p>
-                    <p><strong>Email:</strong> ${userData.email || 'N/A'}</p>
-                    <pre>${JSON.stringify(userData, null, 2)}</pre>
-                `;
-                errorMessageDiv.textContent = '';
+                const data = await response.json(); // data = { id_token, access_token, claims, message }
+
+                const decodedIdToken = decodeJwtPayload(data.id_token);
+                const decodedAccessToken = decodeJwtPayload(data.access_token);
+
+                let userInfoHtml = `<h3>${escapeHtml(data.message) || 'User Information'}</h3>`;
+
+                userInfoHtml += '<h4>ID Token Claims (from BFF session):</h4>';
+                userInfoHtml += `<pre>${JSON.stringify(data.claims, null, 2)}</pre>`;
+
+                userInfoHtml += '<h4>Decoded ID Token Payload (client-side decode):</h4>';
+                userInfoHtml += `<pre>${JSON.stringify(decodedIdToken, null, 2)}</pre>`;
+
+                if (decodedAccessToken) {
+                  userInfoHtml += '<h4>Decoded Access Token Payload (client-side decode):</h4>';
+                  userInfoHtml += `<pre>${JSON.stringify(decodedAccessToken, null, 2)}</pre>`;
+                } else {
+                  userInfoHtml += '<h4>Access Token (Opaque or unparseable by client):</h4>';
+                  // Displaying raw access token can be long, consider if it's always needed.
+                  // For JWT access tokens, decoding might be useful. For opaque ones, it's just a string.
+                  userInfoHtml += `<pre style="word-wrap: break-word; white-space: pre-wrap;">${escapeHtml(data.access_token)}</pre>`;
+                }
+
+                userInfoHtml += '<h4>Raw ID Token:</h4>';
+                userInfoHtml += `<pre style="word-wrap: break-word; white-space: pre-wrap;">${escapeHtml(data.id_token)}</pre>`;
+
+                userInfoHtml += '<h4>Raw Access Token:</h4>';
+                userInfoHtml += `<pre style="word-wrap: break-word; white-space: pre-wrap;">${escapeHtml(data.access_token)}</pre>`;
+
+                userInfoDiv.innerHTML = userInfoHtml;
+                errorMessageDiv.textContent = ''; // Clear any previous errors
                 loginButton.style.display = 'none';
                 fetchUserButton.style.display = 'none';
                 logoutButton.style.display = 'block';
@@ -78,7 +139,11 @@ document.addEventListener('DOMContentLoaded', () => {
         loginButton.addEventListener('click', login);
     }
     if (fetchUserButton) {
-        fetchUserButton.addEventListener('click', fetchUser);
+        fetchUserButton.addEventListener('click', () => {
+            if (window.confirm("About to call BFF to get user info. Proceed?")) {
+                fetchUser();
+            }
+        });
     }
     if (logoutButton) {
         logoutButton.addEventListener('click', logout);
