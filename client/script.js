@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const fetchUser = async () => {
         try {
-            const response = await fetch(`${bffBaseUrl}/api/user`);
+            const response = await fetch(`${bffBaseUrl}/api/user`, { credentials: 'include' });
 
             if (response.ok) { // Status 200-299
                 const userData = await response.json();

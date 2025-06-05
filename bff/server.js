@@ -39,14 +39,29 @@ if (allowSelfSignedCerts) {
 }
 
 // --- Express Session Setup ---
+const cors = require('cors'); // Require CORS middleware
+
+// CORS options
+const corsOptions = {
+  origin: frontendUrl, // Dynamically set from process.env.FRONTEND_URL
+  credentials: true,    // Allow cookies to be sent across origins
+};
+app.use(cors(corsOptions)); // Enable CORS with options
+
+const isProduction = process.env.NODE_ENV === 'production';
+if (isProduction) {
+  app.set('trust proxy', 1); // Trust first proxy if using a reverse proxy in production
+}
+
 app.use(session({
   secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+    secure: isProduction, // True if NODE_ENV is 'production', false otherwise
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: isProduction ? 'None' : 'Lax' // 'None' for production (requires Secure), 'Lax' for local dev
   }
 }));
 
@@ -92,6 +107,8 @@ Issuer.discover(pingIssuerUrl)
 
     // --- Express Routes ---
 
+    const requestedScopes = ['openid', 'profile', 'email']; // Define scopes centrally
+
     // Login route: Serves a confirmation page
     app.get('/login', (req, res) => {
       const confirmationPageHtml = `
@@ -106,6 +123,7 @@ Issuer.discover(pingIssuerUrl)
             .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; }
             h1 { color: #333; }
             p { color: #555; margin-bottom: 20px; }
+            .scopes { font-size: 0.9em; color: #666; margin-bottom:25px; }
             .button { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; text-decoration: none; font-size: 16px; cursor: pointer; }
             .button:hover { background-color: #0056b3; }
           </style>
@@ -114,6 +132,7 @@ Issuer.discover(pingIssuerUrl)
           <div class="container">
             <h1>Confirm Login</h1>
             <p>You are about to be redirected to PingFederate to log in.</p>
+            <p class="scopes">This application will request access to the following information: <strong>${requestedScopes.join(', ')}</strong>.</p>
             <form action="/initiate-ping-login" method="GET">
               <button type="submit" class="button">Proceed to PingFederate</button>
             </form>
@@ -135,14 +154,14 @@ Issuer.discover(pingIssuerUrl)
       req.session.oidcState = state; // Store state in session to verify on callback
 
       const authUrl = oidcClient.authorizationUrl({
-        scope: 'openid profile email', // Adjust scopes as needed
+        scope: requestedScopes.join(' '), // Use the centrally defined scopes, space-separated
         state: state,
       });
       console.log(`Redirecting to PingFederate for login via /initiate-ping-login: ${authUrl}`);
       res.redirect(authUrl);
     });
 
-    // Callback route: Handles redirect from PingFederate
+    // Callback route: Handles redirect from PingFederate, displays code, and asks for confirmation to exchange
     app.get('/auth/callback', async (req, res, next) => {
       if (!oidcClient) {
         console.error('OIDC client not initialized at /auth/callback');
@@ -152,26 +171,94 @@ Issuer.discover(pingIssuerUrl)
         const params = oidcClient.callbackParams(req);
 
         // Verify state parameter
-        if (params.state !== req.session.oidcState) {
-            console.error('OIDC state mismatch. Possible CSRF attack.');
-            return next(new Error('State mismatch. Possible CSRF attack.'));
+        if (!req.session.oidcState || params.state !== req.session.oidcState) {
+            console.error('OIDC state mismatch or session state missing. Possible CSRF attack or session issue.');
+            // It's important to clear the potentially compromised oidcState from session if it exists
+            if (req.session.oidcState) delete req.session.oidcState;
+            return next(new Error('State mismatch or session state missing. Possible CSRF attack or session issue.'));
         }
         delete req.session.oidcState; // State validated, remove from session
 
-        const tokenSet = await oidcClient.callback(redirectUri, params, { state: params.state });
+        // Store OIDC callback parameters in session to be used in the next step
+        req.session.oidcCallbackParams = params;
+        console.log('OIDC callback parameters stored in session.');
 
-        req.session.tokenSet = tokenSet;
-        req.session.userInfo = tokenSet.claims();
+        const authCode = params.code;
+        const confirmationPageHtml = `
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Confirm Authorization Code</title>
+            <style>
+              body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f4f4f4; color: #333; }
+              .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; }
+              h1 { color: #333; }
+              p { color: #555; margin-bottom: 10px; }
+              .code-display { background-color: #e9e9e9; padding: 10px; border-radius: 4px; margin-bottom: 20px; word-break: break-all; font-family: monospace; }
+              .button { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; text-decoration: none; font-size: 16px; cursor: pointer; }
+              .button:hover { background-color: #0056b3; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>Authorization Code Received</h1>
+              <p>The following authorization code was received from PingFederate:</p>
+              <div class="code-display">${authCode}</div>
+              <p>Click below to exchange this code for tokens and proceed.</p>
+              <form action="/exchange-code" method="GET">
+                <button type="submit" class="button">Exchange Code & Proceed</button>
+              </form>
+            </div>
+          </body>
+          </html>
+        `;
+        res.send(confirmationPageHtml);
 
-        console.log('Tokens received and stored in session.');
-        res.redirect(frontendUrl);
       } catch (err) {
-        console.error('Error in OIDC callback:', err.message, err.stack);
+        console.error('Error in OIDC callback (before token exchange):', err.message, err.stack);
+        // Ensure oidcState is cleared on error too, if it exists and wasn't cleared yet
+        if (req.session && req.session.oidcState) delete req.session.oidcState;
         res.status(500).send(`OIDC callback error: ${err.message}. Check BFF logs.`);
       }
     });
 
     // API User route: Returns user info if authenticated
+    app.get('/exchange-code', async (req, res, next) => {
+      if (!oidcClient) {
+        console.error('OIDC client not initialized at /exchange-code');
+        return next(new Error('OIDC client not initialized.'));
+      }
+      const storedParams = req.session.oidcCallbackParams;
+      if (!storedParams) {
+        console.log('No OIDC callback parameters found in session for /exchange-code. Redirecting to login.');
+        return res.redirect('/login'); // Or an error page
+      }
+      delete req.session.oidcCallbackParams; // Clear after retrieval, before any async operation
+
+      try {
+        // The redirectUri here must match the one used when initiating login
+        // and registered in PingFederate.
+        // 'state' from storedParams is used by oidcClient.callback for final validation if it needs to.
+        const tokenSet = await oidcClient.callback(redirectUri, storedParams, {
+          state: storedParams.state
+          // If a nonce was used in authorizationUrl, it should be stored in session
+          // and passed here, e.g., { state: storedParams.state, nonce: req.session.nonce }
+          // delete req.session.nonce; // then delete it
+        });
+
+        req.session.tokenSet = tokenSet;
+        req.session.userInfo = tokenSet.claims();
+        console.log('Tokens received via /exchange-code and stored in session.');
+        res.redirect(frontendUrl);
+      } catch (err) {
+        console.error('Error in OIDC token exchange (/exchange-code):', err.message, err.stack);
+        // Optionally, inform the user more gracefully
+        res.status(500).send(`OIDC token exchange error: ${err.message}. Check BFF logs. <a href="/login">Try logging in again</a>`);
+      }
+    });
+
     app.get('/api/user', (req, res) => {
       if (req.session.userInfo) {
         res.json(req.session.userInfo);
