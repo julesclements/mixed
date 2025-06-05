@@ -48,14 +48,20 @@ const corsOptions = {
 };
 app.use(cors(corsOptions)); // Enable CORS with options
 
+const isProduction = process.env.NODE_ENV === 'production';
+if (isProduction) {
+  app.set('trust proxy', 1); // Trust first proxy if using a reverse proxy in production
+}
+
 app.use(session({
   secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+    secure: isProduction, // True if NODE_ENV is 'production', false otherwise
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: isProduction ? 'None' : 'Lax' // 'None' for production (requires Secure), 'Lax' for local dev
   }
 }));
 

@@ -120,6 +120,21 @@ It uses `express-session` for session management and `openid-client` for OIDC in
     *   This is essential for local development when the client (e.g., Parcel dev server on `http://localhost:1234`) and the BFF (on `http://localhost:3001`) operate on different ports (and thus different origins).
     *   The CORS policy is configured in `bff/server.js` to allow requests specifically from the `FRONTEND_URL` (defined in your `bff/.env` file) and to allow credentials (e.g., cookies) to be sent and received. This ensures that the client can make authenticated API calls to the BFF.
 
+6.  **Session Cookie Configuration:**
+    *   The BFF's session cookie behavior is dynamically configured based on the `NODE_ENV` environment variable:
+        *   **Development (e.g., `NODE_ENV=development` or not set):**
+            *   `cookie.secure` is `false`.
+            *   `cookie.sameSite` is `'Lax'`.
+            *   This setup is suitable for local development over HTTP, where the client (e.g., `http://localhost:1234`) and BFF (e.g., `http://localhost:3001`) might be on different ports but the same hostname.
+        *   **Production (`NODE_ENV=production`):**
+            *   `cookie.secure` is `true` (ensuring the cookie is only sent over HTTPS).
+            *   `cookie.sameSite` is `'None'`. This is necessary for cross-domain scenarios, such as when the client is on `https://julesclements.github.io` and the BFF is on `https://mixed.hdc.company`.
+            *   **Important:** For `SameSite=None` and `secure=true` to function correctly, the BFF **must be served over HTTPS** in production.
+    *   **`trust proxy` Setting:**
+        *   In production mode (`NODE_ENV=production`), `app.set('trust proxy', 1);` is enabled.
+        *   This setting is crucial if you deploy the BFF behind a reverse proxy (e.g., Nginx, AWS ELB/ALB) that terminates TLS (handles HTTPS) and forwards requests to the BFF over HTTP.
+        *   It allows Express to correctly determine that the connection was originally secure, which is essential for the `secure: true` cookie attribute to work as intended. Without it, Express might think the connection is insecure (HTTP) and refuse to set the secure cookie.
+
 ## Client Setup (`/client` directory)
 
 The client is a static Javascript application that makes API calls to the BFF.
