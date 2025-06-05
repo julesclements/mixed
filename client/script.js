@@ -5,6 +5,7 @@
 // For simple element existence, this is fine. Event listeners will be attached in DOMContentLoaded.
 let loginButton, fetchUserButton, logoutButton, userInfoDiv, errorMessageDiv, introspectionSection;
 let bffBaseUrl = ''; // Default to same-origin, will be set in DOMContentLoaded
+let currentCorrelationId = null; // For X-Correlation-ID header
 
 // Dynamically determine BFF base URL - this part needs to be inside DOMContentLoaded
 // or called from there, as window.location might not be fully reliable before that for complex scenarios,
@@ -150,9 +151,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const login = () => {
-        // Redirect to the BFF's login endpoint
-        // The BFF will handle the OIDC redirect to PingFederate
-        window.location.href = `${bffBaseUrl}/login`;
+    currentCorrelationId = generateUUIDv4(); // Generate and set for this new journey
+    console.log('Login initiated. New X-Correlation-ID for this journey:', currentCorrelationId);
+
+    // Redirect to the BFF's login endpoint, passing correlationId as a query parameter
+    window.location.href = `${bffBaseUrl}/login?correlationId=${currentCorrelationId}`;
     };
 
     const logout = () => {
@@ -190,6 +193,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (fetchUserButton) fetchUserButton.style.display = 'block';
     if (logoutButton) logoutButton.style.display = 'none';
 });
+
+// --- Helper Functions ---
+
+function generateUUIDv4() {
+  return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+  );
+}
 
 // Helper function to decode JWT payload (simplistic, no signature verification)
 function decodeJwtPayload(token) {
@@ -231,8 +242,19 @@ const fetchUser = async () => {
         console.error('Required DOM elements not found in fetchUser.');
         return;
     }
+
+    if (!currentCorrelationId) {
+      currentCorrelationId = generateUUIDv4();
+      console.log('Generated new X-Correlation-ID for fetchUser journey:', currentCorrelationId);
+    }
+
     try {
-        const response = await fetch(`${bffBaseUrl}/api/user`, { credentials: 'include' });
+        const response = await fetch(`${bffBaseUrl}/api/user`, {
+            credentials: 'include',
+            headers: {
+                'X-Correlation-ID': currentCorrelationId
+            }
+        });
 
         if (response.ok) { // Status 200-299
             const data = await response.json();
@@ -321,6 +343,13 @@ async function handleIntrospectionClick(accessTokenString) {
       return;
   }
 
+  if (!currentCorrelationId) {
+    // This might indicate a new "journey" or an unexpected state if fetchUser wasn't called first
+    // or if the user directly tries an action that calls this without a preceding fetchUser.
+    currentCorrelationId = generateUUIDv4();
+    console.log('Generated new X-Correlation-ID for introspection journey:', currentCorrelationId);
+  }
+
   const displayAreaId = 'introspectionDisplayArea';
   let displayArea = document.getElementById(displayAreaId);
 
@@ -340,6 +369,7 @@ async function handleIntrospectionClick(accessTokenString) {
       credentials: 'include', // Send session cookies
       headers: {
         'Content-Type': 'application/json',
+        'X-Correlation-ID': currentCorrelationId
       },
       body: JSON.stringify({ token_to_introspect: accessTokenString }),
     });
