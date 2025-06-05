@@ -89,9 +89,14 @@ It uses `express-session` for session management and `openid-client` for OIDC in
     *   `PING_ISSUER_URL`: The issuer URI of your PingFederate server (e.g., `https://ping.hdc.company` or `https://localhost:9031`). The library will use this to discover OIDC endpoints.
     *   `SESSION_SECRET`: A long, random, and secure string used to sign the session ID cookie. Generate a strong one.
     *   `BFF_PORT`: The port on which the BFF server will listen (default is `3001`).
-    *   `FRONTEND_URL`: The URL of your client application.
-        *   For local client development (e.g., using Parcel's dev server): `http://localhost:1234` (or your client's port).
-        *   For testing against a deployed client: Your GitHub Pages URL (e.g., `https://julesclements.github.io/mixed/`).
+    *   `FRONTEND_URL`: **Crucial for CORS configuration.** This **MUST be the exact *origin*** of your client application.
+        *   An origin is defined by its scheme (e.g., `http` or `https`), hostname (e.g., `localhost`, `julesclements.github.io`), and port (if not the default for the scheme, e.g., `:1234`).
+        *   **DO NOT include paths or trailing slashes.**
+        *   **Correct Examples:**
+            *   For local client development (Parcel dev server): `http://localhost:1234`
+            *   For the production client on GitHub Pages: `https://julesclements.github.io`
+        *   **Incorrect Examples:** `http://localhost:1234/`, `https://julesclements.github.io/mixed/`
+        *   **Why it's important:** The BFF's `Access-Control-Allow-Origin` header in CORS responses is set to this `FRONTEND_URL`. For the browser to allow cross-origin requests (e.g., from the client at `http://localhost:1234` to the BFF at `http://localhost:3001`), this value must exactly match the `Origin` header sent by the browser with the request. Any mismatch will cause the browser to block the response due to CORS policy.
     *   `BFF_BASE_URL`: The base URL where the BFF itself is running. This is crucial for constructing the `redirect_uri` that PingFederate will use.
         *   For local development: `http://localhost:3001` (or whatever `BFF_PORT` is).
         *   For production: `https://mixed.hdc.company` (this is the public URL of your deployed BFF).
