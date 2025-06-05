@@ -94,3 +94,30 @@ button:hover {
 #errorMessage:empty {
     display: none;
 }
+
+.introspection-section {
+    text-align: left; /* Overrides parent's text-align: center if needed */
+    margin-top: 20px; /* Already set inline, but good for consistency */
+}
+
+/* Styling for the dynamically created introspection display area */
+#introspectionDisplayArea {
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+}
+
+#introspectionDisplayArea h4 {
+    margin-top: 0;
+    color: #333;
+}
+
+#introspectionDisplayArea pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    background-color: #efefef;
+    padding: 10px;
+    border-radius: 4px;
+}

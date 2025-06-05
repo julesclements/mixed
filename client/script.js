@@ -94,7 +94,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 userInfoHtml += `<pre style="word-wrap: break-word; white-space: pre-wrap;">${escapeHtml(data.access_token)}</pre>`;
 
                 userInfoDiv.innerHTML = userInfoHtml;
-                errorMessageDiv.textContent = ''; // Clear any previous errors
+
+                // Conditionally add/remove Introspect Access Token button
+                const introspectionSection = document.getElementById('introspectionSection');
+                introspectionSection.innerHTML = ''; // Clear previous button or results from this section
+
+                if (!decodedAccessToken && data.access_token) { // If token is opaque (not decoded) and exists
+                    const introspectButton = document.createElement('button');
+                    introspectButton.id = 'introspectTokenButton'; // ID for potential direct styling or selection
+                    // introspectButton.className = 'button'; // Use if you have a general .button CSS class
+                    introspectButton.textContent = 'Introspect Access Token';
+                    introspectButton.addEventListener('click', () => handleIntrospectionClick(data.access_token));
+                    introspectionSection.appendChild(introspectButton);
+                }
+
+                errorMessageDiv.textContent = ''; // Clear any previous global errors
                 loginButton.style.display = 'none';
                 fetchUserButton.style.display = 'none';
                 logoutButton.style.display = 'block';
@@ -152,3 +166,57 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial state: Check authentication status by trying to fetch user info
     // fetchUser(); // Call is now only manual via button. User must click "Get User Info".
 });
+
+// Placeholder for the introspection handler function
+async function handleIntrospectionClick(accessTokenString) {
+  console.log('Introspection requested for token (first 20 chars):', accessTokenString.substring(0, 20) + "...");
+
+  const displayAreaId = 'introspectionDisplayArea';
+  let displayArea = document.getElementById(displayAreaId);
+
+  // Get or create the display area within the introspectionSection
+  const introspectionSection = document.getElementById('introspectionSection');
+  let displayArea = document.getElementById(displayAreaId);
+
+  if (!displayArea) {
+    displayArea = document.createElement('div');
+    displayArea.id = displayAreaId;
+    introspectionSection.appendChild(displayArea); // Append to the dedicated section
+  }
+  // else { // If it exists, clear previous results before showing "loading"
+  //   displayArea.innerHTML = '';
+  // }
+
+  displayArea.innerHTML = '<p>Introspecting token...</p>'; // Show loading state
+  errorMessageDiv.textContent = ''; // Clear previous global errors (if any were set by this action before)
+
+  try {
+    const response = await fetch(`${bffBaseUrl}/api/introspect-token`, {
+      method: 'POST',
+      credentials: 'include', // Send session cookies
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ token_to_introspect: accessTokenString }),
+    });
+
+    const introspectionData = await response.json(); // Try to parse JSON regardless of response.ok
+
+    if (response.ok) {
+      displayArea.innerHTML = '<h4>Introspection Result:</h4><pre>' + JSON.stringify(introspectionData, null, 2) + '</pre>';
+    } else {
+      console.error('Introspection failed:', introspectionData);
+      let errorMsg = `Introspection Error ${response.status}: ${introspectionData.error || response.statusText}`;
+      if (introspectionData.message) errorMsg += ` - ${introspectionData.message}`;
+      if (introspectionData.details) errorMsg += ` (Details: ${JSON.stringify(introspectionData.details)})`;
+      displayArea.innerHTML = `<p style="color:red;">${escapeHtml(errorMsg)}</p>`;
+      // Also display in main error message div for more visibility if desired
+      errorMessageDiv.textContent = `Introspection failed. See details above or in console.`;
+    }
+  } catch (error) {
+    console.error('Network error during token introspection:', error);
+    const networkErrorMsg = 'Network error or BFF unavailable during token introspection.';
+    displayArea.innerHTML = `<p style="color:red;">${escapeHtml(networkErrorMsg)}</p>`;
+    errorMessageDiv.textContent = networkErrorMsg;
+  }
+}
