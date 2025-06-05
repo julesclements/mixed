@@ -172,13 +172,13 @@ async function handleIntrospectionClick(accessTokenString) {
   console.log('Introspection requested for token (first 20 chars):', accessTokenString.substring(0, 20) + "...");
 
   const displayAreaId = 'introspectionDisplayArea';
-  let displayArea = document.getElementById(displayAreaId);
-
-  // Get or create the display area within the introspectionSection
   const introspectionSection = document.getElementById('introspectionSection');
-  let displayArea = document.getElementById(displayAreaId);
+  let displayArea = document.getElementById(displayAreaId); // Attempt to get existing displayArea
 
-  if (!displayArea) {
+  // Create display area if it doesn't exist (e.g., first click)
+  // or ensure it's a child of introspectionSection if it was somehow misplaced or not yet added
+  if (!displayArea || !introspectionSection.contains(displayArea)) {
+    if (displayArea) displayArea.remove(); // Remove if it exists but not in correct parent
     displayArea = document.createElement('div');
     displayArea.id = displayAreaId;
     introspectionSection.appendChild(displayArea); // Append to the dedicated section
