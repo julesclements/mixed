@@ -6,6 +6,7 @@ const session = require('express-session');
 const { Issuer, custom } = require('openid-client');
 const https = require('https');
 const crypto = require('crypto');
+const cors = require('cors'); // Moved to top-level requires
 
 const app = express(); // Define app instance at a higher scope
 let oidcClient; // Define oidcClient at a higher scope
@@ -69,8 +70,13 @@ async function startServer() {
         });
 
         // --- Express Middleware Setup (Should be configured before routes) ---
-        app.use(cors({ origin: frontendOrigin, credentials: true }));
-        app.use(express.json());
+        // CORS options
+        const corsOptions = {
+          origin: frontendOrigin, // Use frontendOrigin for CORS
+          credentials: true,
+        };
+        app.use(cors(corsOptions)); // Enable CORS with options
+        app.use(express.json()); // Middleware to parse JSON bodies
 
         const isProduction = process.env.NODE_ENV === 'production';
         if (isProduction) {
@@ -257,7 +263,7 @@ async function startServer() {
         if (allowSelfSignedCerts) {
           Issuer[custom.http_options] = originalHttpOptions; // Restore on discovery error
         }
-        console.error('Failed to discover OIDC issuer or critical OIDC setup error:', err.message);
+        console.error('Failed to discover OIDC issuer or other critical setup error:', err.message);
         if ((err.message.includes('self-signed certificate') || err.message.includes('unable to verify the first certificate'))) {
             if (allowSelfSignedCerts) {
                 console.error('Self-signed cert error despite ALLOW_SELF_SIGNED_CERTS=true. Check http_options/agent or PingFederate TLS.');
