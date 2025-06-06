@@ -211,7 +211,13 @@ Issuer.discover(pingIssuerUrl)
         return res.status(400).json({ error: 'token_to_introspect is required and must be a string.' });
       }
       try {
-        const introspectionResult = await oidcClient.introspect(tokenToIntrospect);
+        let httpOptions;
+        if (correlationId) {
+          httpOptions = { headers: { 'X-Correlation-ID': correlationId } };
+          console.log(`Forwarding X-Correlation-ID to introspection endpoint: ${correlationId}`);
+        }
+        // Pass httpOptions as part of the second argument object for .introspect()
+        const introspectionResult = await oidcClient.introspect(tokenToIntrospect, { httpOptions });
         res.json(introspectionResult);
       } catch (err) {
         console.error(`Error during token introspection. Correlation ID: ${correlationId || 'N/A'}. Error: ${err.message}`, err.stack);
