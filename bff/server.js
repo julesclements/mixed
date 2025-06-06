@@ -214,10 +214,19 @@ Issuer.discover(pingIssuerUrl)
         let httpOptions;
         if (correlationId) {
           httpOptions = { headers: { 'X-Correlation-ID': correlationId } };
-          console.log(`Forwarding X-Correlation-ID to introspection endpoint: ${correlationId}`);
+          console.log(`Forwarding X-Correlation-ID ${correlationId} to PingFederate introspection endpoint.`);
+        } else {
+          console.log('No X-Correlation-ID to forward for introspection.');
+          // httpOptions remains undefined
         }
-        // Pass httpOptions as part of the second argument object for .introspect()
-        const introspectionResult = await oidcClient.introspect(tokenToIntrospect, { httpOptions });
+
+        // Corrected call: client.introspect(token, [tokenTypeHint], [extras])
+        // tokenTypeHint is a string, extras is an object that can contain httpOptions.
+        const introspectionResult = await oidcClient.introspect(
+          tokenToIntrospect,       // first argument: the token string
+          'access_token',          // second argument: token_type_hint
+          httpOptions ? { httpOptions } : undefined // third argument (extras): an object containing httpOptions if they exist
+        );
         res.json(introspectionResult);
       } catch (err) {
         console.error(`Error during token introspection. Correlation ID: ${correlationId || 'N/A'}. Error: ${err.message}`, err.stack);
