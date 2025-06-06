@@ -191,9 +191,39 @@ The client is a static Javascript application that makes API calls to the BFF.
 ## Deployment
 
 ### Client Application (`/client`)
-*   The client application is configured to be built and deployed to **GitHub Pages** automatically.
-*   This is handled by the GitHub Actions workflow defined in `.github/workflows/client-deploy.yml`.
-*   Deployment happens on pushes to the `main` branch (if changes are detected in the `client/` directory or the workflow file).
+
+The client application can be deployed in two ways:
+
+1.  **GitHub Pages (Static Deployment):**
+    *   The client application is configured to be built and deployed to **GitHub Pages** automatically.
+    *   This is handled by the GitHub Actions workflow defined in `.github/workflows/client-deploy.yml`.
+    *   Deployment happens on pushes to the `main` branch (if changes are detected in the `client/` directory or the workflow file).
+    *   The live URL will be something like `https://julesclements.github.io/mixed/`.
+
+2.  **Docker Container (Static Serve):**
+    *   The client application can also be built into a Docker container that serves its static files using the `serve` package.
+    *   A `client/Dockerfile` is provided for this.
+    *   **Local Docker Build & Run:**
+        *   To build the image locally:
+            ```bash
+            docker build -t yourdockerhubusername/ping-client:latest client/
+            ```
+            (Replace `yourdockerhubusername` with your Docker Hub username or any desired image name).
+        *   To run the container locally:
+            ```bash
+            docker run -d -p 8080:8080 yourdockerhubusername/ping-client:latest
+            ```
+            The client will then be accessible at `http://localhost:8080`.
+    *   **Automated Docker Build (GitHub Actions):**
+        *   The `.github/workflows/client-docker-build.yml` workflow automatically builds and pushes the client's Docker image to Docker Hub.
+        *   This happens on pushes to `main` if files in the `client/` directory or the `client-docker-build.yml` workflow file itself are changed.
+        *   The image is tagged as `yourdockerhubusername/ping-client:latest` (or similar, based on the workflow and secrets).
+        *   **Required GitHub Secrets:** For this workflow to push to Docker Hub, you must configure `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` in your GitHub repository secrets.
+    *   **Client Configuration (`bffBaseUrl` when containerized):**
+        *   When the client is run from its Docker container and accessed (e.g., via `http://localhost:8080` locally), the `bffBaseUrl` in `client/script.js` will be determined by `window.location.hostname`.
+        *   If accessed via `localhost`, it will attempt to connect to the BFF at `http://localhost:3001` (as per current `script.js` logic).
+        *   If the BFF is also running in a Docker container locally, ensure Docker networking allows communication (e.g., by using a shared Docker network or ensuring the BFF's port is mapped to the host).
+        *   For deployed scenarios (e.g., client container hosted, BFF at `https://mixed.hdc.company`), the client's `bffBaseUrl` logic should correctly point to the production BFF URL if the client is accessed via its production hostname (e.g., `julesclements.github.io` or a custom domain).
 
 ### BFF Application (`/bff`)
 *   The BFF application is designed to be run as a **Docker container**.
