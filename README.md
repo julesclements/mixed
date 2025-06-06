@@ -125,7 +125,14 @@ It uses `express-session` for session management and `openid-client` for OIDC in
         ```
         If you don't have `nodemon` installed globally, you can install it as a dev dependency (`npm install -D nodemon`) or run with `npx nodemon server.js`.
 
-5.  **CORS Configuration:**
+5.  **Startup Retry Mechanism:**
+    *   The BFF server (`bff/server.js`) includes a startup retry mechanism for OIDC issuer discovery.
+    *   If the PingFederate instance (specified by `PING_ISSUER_URL`) is not immediately reachable when the BFF starts, the BFF will automatically retry the connection attempt.
+    *   Retries occur every 10 seconds for a default maximum of 10 minutes (60 attempts).
+    *   Startup attempt progress, failures, and retries are logged to the console output (or container logs).
+    *   This makes the BFF more resilient, especially in orchestrated environments (like Docker Compose or Kubernetes) where services might start in an unpredictable order.
+
+6.  **CORS Configuration:**
     *   The BFF uses the `cors` package to handle Cross-Origin Resource Sharing.
     *   This is essential for local development when the client (e.g., Parcel dev server on `http://localhost:1234`) and the BFF (on `http://localhost:3001`) operate on different ports (and thus different origins).
     *   The CORS policy is configured in `bff/server.js` to allow requests specifically from the `FRONTEND_URL` (defined in your `bff/.env` file) and to allow credentials (e.g., cookies) to be sent and received. This ensures that the client can make authenticated API calls to the BFF.
