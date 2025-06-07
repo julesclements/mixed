@@ -1,0 +1,272 @@
+:root {
+  --primary-color: #0078D4;  /* Microsoft Blue */
+  --primary-light: #2B88D8;
+  --primary-dark: #005A9E;
+  --secondary-color: #106EBE;
+  --accent-color: #FFAA44;
+  --success-color: #107C10;
+  --error-color: #A4262C;
+  --background-color: #F5F5F5;
+  --card-background: #FFFFFF;
+  --text-color: #323130;
+  --text-secondary: #605E5C;
+  --border-color: #EDEBE9;
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--background-color);
+  color: var(--text-color);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.container {
+  width: 100%;
+  max-width: 100%;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-card {
+  background-color: var(--card-background);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px var(--shadow-color);
+  padding: 2.5rem;
+  width: 100%;
+  max-width: 480px;
+  text-align: center;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.auth-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.logo-container {
+  margin-bottom: 1.5rem;
+}
+
+.logo {
+  width: 64px;
+  height: 64px;
+  color: var(--primary-color);
+}
+
+h1 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--text-color);
+}
+
+p {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+}
+
+.action-container {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.login-button {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 300px;
+}
+
+.login-button svg {
+  margin-left: 8px;
+  transition: transform 0.2s ease;
+}
+
+.login-button:hover, .login-button.hover {
+  background-color: var(--primary-light);
+  transform: translateY(-2px);
+}
+
+.login-button:hover svg, .login-button.hover svg {
+  transform: translateX(4px);
+}
+
+.login-button:active {
+  background-color: var(--primary-dark);
+  transform: translateY(0);
+}
+
+.auth-success {
+  position: relative;
+  overflow: hidden;
+}
+
+.success-icon {
+  color: var(--success-color);
+  margin-bottom: 1.5rem;
+  animation: fadeInDown 0.5s ease-out;
+}
+
+.auth-code-container {
+  margin: 2rem 0;
+  background-color: #F3F2F1;
+  border-radius: 4px;
+  padding: 1.5rem;
+  position: relative;
+}
+
+h2 {
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+  color: var(--text-color);
+}
+
+.code-display {
+  background-color: #F8F8F8;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 1rem;
+  position: relative;
+  text-align: left;
+  overflow-x: auto;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+pre {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  color: var(--text-color);
+  margin: 0;
+  font-size: 0.9rem;
+  word-break: break-all;
+  white-space: pre-wrap;
+  flex: 1;
+}
+
+.copy-button {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.copy-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: var(--primary-color);
+}
+
+.copy-button.copied {
+  color: var(--success-color);
+}
+
+.copy-button.copied::after {
+  content: 'Copied!';
+  position: absolute;
+  right: 40px;
+  background-color: var(--success-color);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  animation: fadeOut 2s forwards;
+}
+
+.back-button, .logout-button {
+  padding: 0.6rem 1.2rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  text-decoration: none;
+  margin: 0 0.5rem;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.back-button {
+  background-color: #F3F2F1;
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+}
+
+.back-button:hover {
+  background-color: #EDEBE9;
+}
+
+.logout-button {
+  background-color: transparent;
+  color: var(--primary-color);
+  border: 1px solid var(--primary-color);
+}
+
+.logout-button:hover {
+  background-color: rgba(0, 120, 212, 0.05);
+}
+
+/* Animations */
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  0% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 768px) {
+  .auth-card {
+    padding: 1.5rem;
+  }
+  
+  .action-container {
+    flex-direction: column;
+  }
+  
+  .back-button, .logout-button {
+    margin: 0.5rem 0;
+    width: 100%;
+    text-align: center;
+  }
+}
