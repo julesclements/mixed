@@ -307,6 +307,56 @@ This section addresses common issues encountered when deploying the client and B
 
 This troubleshooting guide should help in diagnosing and understanding potential production deployment issues related to cross-site cookie handling.
 
+## SPA Application (`/spa` directory)
+
+This directory contains a separate Single Page Application (SPA), distinct from the `/client` application. It is also designed to be built and deployed as a Docker container.
+
+*(Note: The initial setup for this SPA, including its `package.json` and source files, would need to be provided or developed. The instructions below assume a typical Node.js based SPA setup where `npm run build` produces static assets in a `dist` directory, and these assets are served by the Docker container.)*
+
+### Local Development & Build (Example)
+
+1.  **Navigate to the SPA directory:**
+    ```bash
+    cd spa
+    ```
+2.  **Install Dependencies (if it has its own `package.json`):**
+    ```bash
+    npm install
+    ```
+3.  **Build the SPA (if applicable):**
+    ```bash
+    npm run build
+    ```
+    (This command depends on the SPA's `package.json` scripts. It's assumed to output files to a `dist` directory within `/spa`.)
+
+### Docker Deployment
+
+The SPA can be deployed as a Docker container using the provided `spa/Dockerfile`.
+
+1.  **Local Docker Build & Run:**
+    *   To build the image locally:
+        ```bash
+        docker build -t yourdockerhubusername/ping-spa:latest spa/
+        ```
+        (Replace `yourdockerhubusername` with your Docker Hub username or any desired image name).
+    *   To run the container locally:
+        ```bash
+        docker run -d -p 1234:1234 yourdockerhubusername/ping-spa:latest
+        ```
+        The SPA will then be accessible at `http://localhost:1234` (as per the port exposed and used in the `spa/Dockerfile`).
+
+2.  **Automated Docker Build (GitHub Actions):**
+    *   The `.github/workflows/spa-docker-build.yml` workflow automatically builds and pushes the SPA's Docker image to Docker Hub.
+    *   This happens on pushes to `main` if files in the `spa/` directory or the `spa-docker-build.yml` workflow file itself are changed.
+    *   The image is tagged as `yourdockerhubusername/ping-spa:latest` (or similar, based on the workflow and secrets).
+    *   **Required GitHub Secrets:** For this workflow to push to Docker Hub, you must configure `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` in your GitHub repository secrets.
+
+3.  **SPA Configuration (e.g., BFF URL):**
+    *   Similar to the `/client` application, the SPA will need to know the URL of the BFF (`bffBaseUrl`).
+    *   If the SPA is a static build, this URL might be configured at build time (e.g., via environment variables passed to the build process) or the SPA's JavaScript might dynamically determine it based on `window.location.hostname` (similar to `client/script.js`).
+    *   When running the SPA Docker container locally (e.g., on `http://localhost:1234`), it would typically try to connect to the BFF at `http://localhost:3001` if the BFF is also running locally and the SPA uses similar dynamic logic as the `/client` app.
+    *   For deployed scenarios, ensure the SPA is configured to point to the production BFF URL (e.g., `https://mixed.hdc.company`).
+
 ### BFF API Endpoints
 
 The BFF exposes the following API endpoints that the client interacts with (after the OIDC login/callback flow which also uses BFF routes like `/login`, `/initiate-ping-login`, `/auth/callback`, `/exchange-code`):
