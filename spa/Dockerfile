@@ -34,4 +34,4 @@ EXPOSE 1234
 # Command to serve the 'content' directory (which contains the SPA's 'dist' output)
 # -s flag is important for single-page applications (SPA)
 # -l flag specifies the listener port
-CMD ["serve", "-s", "content", "-l", "1234"]
+CMD ["serve", "-s", "content", "-l", "5173"]
