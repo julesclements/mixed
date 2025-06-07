@@ -27,11 +27,10 @@ RUN npm install -g serve
 # Copy the built assets from the builder stage
 COPY --from=builder /app/client/docs ./docs
 
-# Expose the port 'serve' will listen on (default for serve is 3000, but can be overridden)
-# Let's use 8080 as a common alternative for containers
-EXPOSE 8080
+# Expose the port 'serve' will listen on (default for serve is 3000, but is overridden in CMD)
+EXPOSE 1234
 
 # Command to serve the 'docs' directory
 # -s flag is important for single-page applications (SPA) to redirect all requests to index.html
 # -l flag specifies the listener port
-CMD ["serve", "-s", "docs", "-l", "8080"]
+CMD ["serve", "-s", "docs", "-l", "1234"]
