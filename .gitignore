@@ -5,3 +5,4 @@ client/.parcel-cache
 client/docs
 
 spa/dist
+spa/.env.development
