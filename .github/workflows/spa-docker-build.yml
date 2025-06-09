@@ -38,6 +38,7 @@ jobs:
           build-args: |
             VITE_STAFF_CLIENT_ID=${{ vars.VITE_STAFF_CLIENT_ID }}
             VITE_CUSTOMER_CLIENT_ID=${{ vars.VITE_CUSTOMER_CLIENT_ID }}
+            VITE_PING_BASE_URL=${{ vars.VITE_PING_BASE_URL }}
           # To add more tags, like git sha:
           # tags: |
           #   ${{ secrets.DOCKERHUB_USERNAME }}/ping-spa:latest
