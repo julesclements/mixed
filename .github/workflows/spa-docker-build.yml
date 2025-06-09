@@ -35,6 +35,9 @@ jobs:
           file: ./spa/Dockerfile # Path to the spa's Dockerfile
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/ping-spa:latest # Example image name, user can customize
+          build-args: |
+            VITE_STAFF_CLIENT_ID=${{ vars.VITE_STAFF_CLIENT_ID }}
+            VITE_CUSTOMER_CLIENT_ID=${{ vars.VITE_CUSTOMER_CLIENT_ID }}
           # To add more tags, like git sha:
           # tags: |
           #   ${{ secrets.DOCKERHUB_USERNAME }}/ping-spa:latest

@@ -34,7 +34,7 @@ COPY --from=builder /app/spa/dist ./content
 # (Serving from a subdirectory like 'content' rather than root of /app for clarity)
 
 # Expose the port 'serve' will listen on
-EXPOSE 1234
+EXPOSE 5173
 
 # Command to serve the 'content' directory (which contains the SPA's 'dist' output)
 # -s flag is important for single-page applications (SPA)
