@@ -7,6 +7,7 @@ const { Issuer, custom } = require('openid-client');
 const https = require('https');
 const crypto = require('crypto');
 const cors = require('cors'); // Moved to top-level requires
+const path = require('path');
 
 const app = express(); // Define app instance at a higher scope
 let oidcClient; // Define oidcClient at a higher scope
@@ -230,6 +231,11 @@ async function startServer() {
             sameSite: isProduction ? 'None' : 'Lax'
           }
         }));
+
+        // Favicon serving
+        app.get('/favicon.ico', (req, res) => {
+          res.sendFile(path.join(__dirname, 'favicon.ico'));
+        });
 
         // --- Express Routes ---
         const requestedScopes = ['openid', 'profile', 'email'];
