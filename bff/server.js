@@ -60,67 +60,104 @@ async function startServer() {
       Issuer[custom.http_options] = (options) => ({ ...options, agent: customAgent });
     }
 
-    // OIDC metadata correction function using internal and browser-facing base URLs
+    // OIDC metadata correction function (Attempt 4)
     function correctIssuerMetadata(metadata, internalBaseUrlString, browserFacingBaseUrlString) {
       const newMetadata = JSON.parse(JSON.stringify(metadata)); // Deep copy
-      const internalUrlObj = new URL(internalBaseUrlString);
-      let browserFacingUrlObj = null;
+      let internalUrlObj;
+      try {
+        internalUrlObj = new URL(internalBaseUrlString);
+      } catch (e) {
+        console.error(`[OIDC Meta] Invalid PING_ISSUER_URL: ${internalBaseUrlString}. Cannot proceed with metadata correction. Error: ${e.message}`);
+        return newMetadata; // Return original metadata if internal URL is invalid
+      }
 
+      let browserFacingUrlObj = null;
       if (browserFacingBaseUrlString && browserFacingBaseUrlString.trim() !== "") {
         try {
           browserFacingUrlObj = new URL(browserFacingBaseUrlString);
-          console.log('[OIDC Metadata Correction] Using explicit browser-facing base URL:', browserFacingBaseUrlString);
+          console.log('[OIDC Meta] Attempting to use explicit browser-facing base URL:', browserFacingBaseUrlString);
         } catch (e) {
-          console.warn(`[OIDC Metadata Correction] Invalid PING_BROWSER_FACING_BASE_URL '${browserFacingBaseUrlString}',_will fallback to internal or localhost-corrected internal URL for browser endpoints. Error: ${e.message}`);
+          console.warn(`[OIDC Meta] Invalid PING_BROWSER_FACING_BASE_URL '${browserFacingBaseUrlString}'. It will not be used for browser-facing endpoints. Error: ${e.message}`);
+          browserFacingUrlObj = null; // Ensure it's null if parsing failed
         }
       } else {
-        console.log('[OIDC Metadata Correction] No explicit browser-facing base URL provided. Browser endpoints will use internal or localhost-corrected internal URL.');
+        console.log('[OIDC Meta] No explicit PING_BROWSER_FACING_BASE_URL provided.');
       }
 
-      const browserFacingKeys = ['authorization_endpoint', 'end_session_endpoint'];
-      // Add any custom PingFederate specific browser-facing endpoints if known, e.g. 'ping_end_session_endpoint'
-      // const customPingBrowserEndpoints = Object.keys(newMetadata).filter(k => k.startsWith('ping_') && k.endsWith('_endpoint'));
-      // browserFacingKeys.push(...customPingBrowserEndpoints);
+      const isSplitUrlScenario = browserFacingUrlObj && browserFacingUrlObj.hostname !== internalUrlObj.hostname;
+      console.log(`[OIDC Meta] Is split URL scenario? ${isSplitUrlScenario}`);
+
+      // Handle 'issuer' property first
+      const originalIssuerValue = newMetadata.issuer;
+      if (typeof originalIssuerValue === 'string') {
+        try {
+          if (isSplitUrlScenario) {
+            const issuerUrl = new URL(originalIssuerValue);
+            issuerUrl.protocol = browserFacingUrlObj.protocol;
+            issuerUrl.hostname = browserFacingUrlObj.hostname;
+            issuerUrl.port = browserFacingUrlObj.port;
+            newMetadata.issuer = issuerUrl.toString();
+            if (originalIssuerValue !== newMetadata.issuer) {
+              console.log(`[OIDC Meta] Corrected 'issuer' for split URL: ${originalIssuerValue} -> ${newMetadata.issuer}`);
+            }
+          } else if (internalUrlObj.hostname !== 'localhost' && originalIssuerValue.includes('://localhost')) {
+            const issuerUrl = new URL(originalIssuerValue);
+            issuerUrl.protocol = internalUrlObj.protocol;
+            issuerUrl.hostname = internalUrlObj.hostname;
+            issuerUrl.port = internalUrlObj.port;
+            newMetadata.issuer = issuerUrl.toString();
+            if (originalIssuerValue !== newMetadata.issuer) {
+              console.log(`[OIDC Meta] Corrected 'issuer' from localhost to internal: ${originalIssuerValue} -> ${newMetadata.issuer}`);
+            }
+          }
+        } catch (e) {
+          console.warn(`[OIDC Meta] Error correcting 'issuer' value '${originalIssuerValue}': ${e.message}`);
+        }
+      }
 
 
-      console.log('[OIDC Metadata Correction] Starting correction process. Internal base URL:', internalBaseUrlString);
-
+      // Iterate over metadata keys for endpoints
       for (const key of Object.keys(newMetadata)) {
+        if (key === 'issuer') {
+          continue; // Already handled
+        }
+
         const currentValue = newMetadata[key];
         if (typeof currentValue !== 'string') {
           continue; // Skip non-string values
         }
 
-        try {
-          // Priority 1: Browser-facing URL correction if applicable and browserFacingUrlObj is valid
-          if (browserFacingKeys.includes(key) && browserFacingUrlObj) {
-            let urlToCorrect = new URL(currentValue); // Parse current value
-            urlToCorrect.protocol = browserFacingUrlObj.protocol;
-            urlToCorrect.hostname = browserFacingUrlObj.hostname;
-            urlToCorrect.port = browserFacingUrlObj.port;
-            newMetadata[key] = urlToCorrect.toString();
-            if (currentValue !== newMetadata[key]) {
-              console.log(`[OIDC Metadata Correction] Corrected BROWSER-FACING ${key}: ${currentValue} -> ${newMetadata[key]}`);
+        const isBrowserFacingEndpoint = ['authorization_endpoint', 'end_session_endpoint'].includes(key);
+        let targetObj = null;
+        let correctionType = '';
+
+        if (isBrowserFacingEndpoint && browserFacingUrlObj) {
+          targetObj = browserFacingUrlObj;
+          correctionType = 'BROWSER-FACING';
+        } else if (currentValue.includes('://localhost') && internalUrlObj.hostname !== 'localhost') {
+          // This condition applies to any localhost URL if it's not a browser-facing one designated for browserFacingUrlObj,
+          // OR if browserFacingUrlObj is not available/valid.
+          targetObj = internalUrlObj;
+          correctionType = 'INTERNAL from localhost';
+        }
+
+        if (targetObj) {
+          try {
+            let endpointUrl = new URL(currentValue);
+            endpointUrl.protocol = targetObj.protocol;
+            endpointUrl.hostname = targetObj.hostname;
+            endpointUrl.port = targetObj.port;
+            if (newMetadata[key] !== endpointUrl.toString()) {
+              console.log(`[OIDC Meta] Corrected ${correctionType} '${key}': ${newMetadata[key]} -> ${endpointUrl.toString()}`);
+              newMetadata[key] = endpointUrl.toString();
             }
+          } catch (e) {
+            console.warn(`[OIDC Meta] Error correcting ${correctionType} '${key}' URL '${currentValue}': ${e.message}. Skipping correction for this key.`);
           }
-          // Priority 2: Internal localhost URL correction (if not already handled by browser-facing logic for that key)
-          else if (currentValue.startsWith('http://localhost:') || currentValue.startsWith('https://localhost:')) {
-            let originalUrlObj = new URL(currentValue);
-            if (originalUrlObj.hostname === 'localhost' && internalUrlObj.hostname !== 'localhost') {
-              originalUrlObj.protocol = internalUrlObj.protocol;
-              originalUrlObj.hostname = internalUrlObj.hostname;
-              originalUrlObj.port = internalUrlObj.port;
-              newMetadata[key] = originalUrlObj.toString();
-              if (currentValue !== newMetadata[key]) {
-                console.log(`[OIDC Metadata Correction] Corrected INTERNAL ${key}: ${currentValue} -> ${newMetadata[key]}`);
-              }
-            }
-          }
-        } catch (e) {
-          console.error(`[OIDC Metadata Correction] Error processing ${key} URL '${currentValue}': ${e.message}. Skipping this key.`);
         }
       }
-      console.log('[OIDC Metadata Correction] Finished correction process. Resulting metadata:', JSON.stringify(newMetadata, null, 2));
+
+      console.log('[OIDC Meta] Finished metadata correction. Resulting metadata:', JSON.stringify(newMetadata, null, 2));
       return newMetadata;
     }
 
