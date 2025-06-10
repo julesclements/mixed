@@ -60,71 +60,86 @@ async function startServer() {
       Issuer[custom.http_options] = (options) => ({ ...options, agent: customAgent });
     }
 
-    // OIDC metadata correction function (Attempt 4)
+    // OIDC metadata correction function (Attempt 5 - Simplified Issuer Logic)
     function correctIssuerMetadata(metadata, internalBaseUrlString, browserFacingBaseUrlString) {
       const newMetadata = JSON.parse(JSON.stringify(metadata)); // Deep copy
       let internalUrlObj;
       try {
         internalUrlObj = new URL(internalBaseUrlString);
       } catch (e) {
-        console.error(`[OIDC Meta] Invalid PING_ISSUER_URL: ${internalBaseUrlString}. Cannot proceed with metadata correction. Error: ${e.message}`);
-        return newMetadata; // Return original metadata if internal URL is invalid
+        console.error(`[OIDC Meta] Invalid PING_ISSUER_URL: ${internalBaseUrlString}. Cannot proceed. Error: ${e.message}`);
+        return metadata; // Return original metadata if internal URL is critically invalid
       }
 
       let browserFacingUrlObj = null;
       if (browserFacingBaseUrlString && browserFacingBaseUrlString.trim() !== "") {
         try {
           browserFacingUrlObj = new URL(browserFacingBaseUrlString);
-          console.log('[OIDC Meta] Attempting to use explicit browser-facing base URL:', browserFacingBaseUrlString);
+          console.log('[OIDC Meta] Will use explicit browser-facing base URL for applicable parts:', browserFacingBaseUrlString);
         } catch (e) {
-          console.warn(`[OIDC Meta] Invalid PING_BROWSER_FACING_BASE_URL '${browserFacingBaseUrlString}'. It will not be used for browser-facing endpoints. Error: ${e.message}`);
-          browserFacingUrlObj = null; // Ensure it's null if parsing failed
+          console.warn(`[OIDC Meta] Invalid PING_BROWSER_FACING_BASE_URL '${browserFacingBaseUrlString}'. It will not be used. Error: ${e.message}`);
+          browserFacingUrlObj = null;
         }
       } else {
-        console.log('[OIDC Meta] No explicit PING_BROWSER_FACING_BASE_URL provided.');
+        console.log('[OIDC Meta] No PING_BROWSER_FACING_BASE_URL provided.');
       }
 
       const isSplitUrlScenario = browserFacingUrlObj && browserFacingUrlObj.hostname !== internalUrlObj.hostname;
       console.log(`[OIDC Meta] Is split URL scenario? ${isSplitUrlScenario}`);
 
-      // Handle 'issuer' property first
-      const originalIssuerValue = newMetadata.issuer;
-      if (typeof originalIssuerValue === 'string') {
+      // --- Refined issuer property handling (Attempt 5) ---
+      const originalDiscoveredIssuer = newMetadata.issuer; // For logging and as a base
+      let finalIssuerValue = originalDiscoveredIssuer; // Default to original
+
+      if (typeof originalDiscoveredIssuer === 'string') { // Ensure issuer is a string before trying to parse/compare
         try {
-          if (isSplitUrlScenario) {
-            const issuerUrl = new URL(originalIssuerValue);
-            issuerUrl.protocol = browserFacingUrlObj.protocol;
-            issuerUrl.hostname = browserFacingUrlObj.hostname;
-            issuerUrl.port = browserFacingUrlObj.port;
-            newMetadata.issuer = issuerUrl.toString();
-            if (originalIssuerValue !== newMetadata.issuer) {
-              console.log(`[OIDC Meta] Corrected 'issuer' for split URL: ${originalIssuerValue} -> ${newMetadata.issuer}`);
+            if (isSplitUrlScenario) {
+                // Prefer the exact browser-facing URL string for 'issuer' in split URL scenarios.
+                finalIssuerValue = browserFacingBaseUrlString;
+            } else {
+                const discoveredIssuerUrl = new URL(originalDiscoveredIssuer);
+                if (internalUrlObj.hostname === 'localhost' && discoveredIssuerUrl.hostname === 'localhost') {
+                    // Both PING_ISSUER_URL and discovered issuer are localhost. Use PING_ISSUER_URL string directly.
+                    finalIssuerValue = internalBaseUrlString;
+                } else if (internalUrlObj.hostname !== 'localhost' && discoveredIssuerUrl.hostname === 'localhost') {
+                    // PING_ISSUER_URL is external, but discovered is localhost. Reconstruct with PING_ISSUER_URL's base.
+                    discoveredIssuerUrl.protocol = internalUrlObj.protocol;
+                    discoveredIssuerUrl.hostname = internalUrlObj.hostname;
+                    discoveredIssuerUrl.port = internalUrlObj.port;
+                    // Path is kept from originalDiscoveredIssuer
+                    finalIssuerValue = discoveredIssuerUrl.toString();
+                }
+                // Else: Discovered issuer is not localhost OR (internal is external and discovered is external and they match or differ - preserve original)
+                // This also covers cases where PING_ISSUER_URL is external and matches the discovered external URL.
             }
-          } else if (internalUrlObj.hostname !== 'localhost' && originalIssuerValue.includes('://localhost')) {
-            const issuerUrl = new URL(originalIssuerValue);
-            issuerUrl.protocol = internalUrlObj.protocol;
-            issuerUrl.hostname = internalUrlObj.hostname;
-            issuerUrl.port = internalUrlObj.port;
-            newMetadata.issuer = issuerUrl.toString();
-            if (originalIssuerValue !== newMetadata.issuer) {
-              console.log(`[OIDC Meta] Corrected 'issuer' from localhost to internal: ${originalIssuerValue} -> ${newMetadata.issuer}`);
+
+            // Normalize: remove trailing slash if it's the only char in path (e.g. "http://host/" -> "http://host")
+            // but keep "http://host/path/" as is.
+            if (finalIssuerValue.endsWith('/') && new URL(finalIssuerValue).pathname === '/') {
+                finalIssuerValue = finalIssuerValue.slice(0, -1);
             }
-          }
+
         } catch (e) {
-          console.warn(`[OIDC Meta] Error correcting 'issuer' value '${originalIssuerValue}': ${e.message}`);
+            console.warn(`[OIDC Meta] Error processing 'issuer' value '${originalDiscoveredIssuer}': ${e.message}. Original will be used.`);
+            finalIssuerValue = originalDiscoveredIssuer; // Fallback to original on error
         }
+
+        if (newMetadata.issuer !== finalIssuerValue) {
+            console.log(`[OIDC Meta] Set 'issuer': ${newMetadata.issuer} -> ${finalIssuerValue}`);
+            newMetadata.issuer = finalIssuerValue;
+        }
+      } else {
+        console.warn(`[OIDC Meta] Original 'issuer' in metadata is not a string: ${originalDiscoveredIssuer}. Skipping 'issuer' correction.`);
       }
 
-
-      // Iterate over metadata keys for endpoints
+      // --- Endpoint Handling (same as Attempt 4) ---
       for (const key of Object.keys(newMetadata)) {
         if (key === 'issuer') {
           continue; // Already handled
         }
-
         const currentValue = newMetadata[key];
         if (typeof currentValue !== 'string') {
-          continue; // Skip non-string values
+          continue;
         }
 
         const isBrowserFacingEndpoint = ['authorization_endpoint', 'end_session_endpoint'].includes(key);
@@ -135,8 +150,6 @@ async function startServer() {
           targetObj = browserFacingUrlObj;
           correctionType = 'BROWSER-FACING';
         } else if (currentValue.includes('://localhost') && internalUrlObj.hostname !== 'localhost') {
-          // This condition applies to any localhost URL if it's not a browser-facing one designated for browserFacingUrlObj,
-          // OR if browserFacingUrlObj is not available/valid.
           targetObj = internalUrlObj;
           correctionType = 'INTERNAL from localhost';
         }
@@ -147,16 +160,16 @@ async function startServer() {
             endpointUrl.protocol = targetObj.protocol;
             endpointUrl.hostname = targetObj.hostname;
             endpointUrl.port = targetObj.port;
+            // Path and query params are preserved from 'currentValue' by default with new URL() and selective part setting.
             if (newMetadata[key] !== endpointUrl.toString()) {
               console.log(`[OIDC Meta] Corrected ${correctionType} '${key}': ${newMetadata[key]} -> ${endpointUrl.toString()}`);
               newMetadata[key] = endpointUrl.toString();
             }
           } catch (e) {
-            console.warn(`[OIDC Meta] Error correcting ${correctionType} '${key}' URL '${currentValue}': ${e.message}. Skipping correction for this key.`);
+            console.warn(`[OIDC Meta] Error correcting ${correctionType} '${key}' URL '${currentValue}': ${e.message}. Skipping.`);
           }
         }
       }
-
       console.log('[OIDC Meta] Finished metadata correction. Resulting metadata:', JSON.stringify(newMetadata, null, 2));
       return newMetadata;
     }
