@@ -55,57 +55,63 @@ async function startServer() {
       Issuer[custom.http_options] = (options) => ({ ...options, agent: customAgent });
     }
 
+    // Refined OIDC metadata correction function (Attempt 3)
+    function correctIssuerMetadata(metadata, expectedBaseUrlString) {
+      const newMetadata = JSON.parse(JSON.stringify(metadata)); // Deep copy
+      const expectedUrlObj = new URL(expectedBaseUrlString);
+
+      console.log('[OIDC Metadata Correction] Starting correction process. Expected base URL:', expectedBaseUrlString);
+
+      for (const key of Object.keys(newMetadata)) {
+        const currentValue = newMetadata[key];
+        if (typeof currentValue === 'string' && (currentValue.startsWith('http://localhost:') || currentValue.startsWith('https://localhost:'))) {
+          try {
+            let originalUrlObj = new URL(currentValue);
+            // Conditional Rewrite: Only change if original is localhost and expected is not localhost.
+            if (originalUrlObj.hostname === 'localhost' && expectedUrlObj.hostname !== 'localhost') {
+              originalUrlObj.protocol = expectedUrlObj.protocol;
+              originalUrlObj.hostname = expectedUrlObj.hostname;
+              originalUrlObj.port = expectedUrlObj.port;
+              newMetadata[key] = originalUrlObj.toString();
+              console.log(`[OIDC Metadata Correction] Conditionally corrected ${key}: ${currentValue} -> ${newMetadata[key]}`);
+            } else {
+              // console.log(`[OIDC Metadata Correction] No change needed for ${key} (${currentValue}) based on hostname conditions.`);
+            }
+          } catch (e) {
+            console.error(`[OIDC Metadata Correction] Error processing ${key} URL '${currentValue}': ${e.message}. Skipping this key.`);
+          }
+        }
+      }
+      console.log('[OIDC Metadata Correction] Finished correction process. Resulting metadata:', JSON.stringify(newMetadata, null, 2));
+      return newMetadata;
+    }
+
     Issuer.discover(pingIssuerUrl)
-      .then(issuer => {
+      .then(originalIssuer => { // Renamed to originalIssuer
         if (allowSelfSignedCerts) {
           Issuer[custom.http_options] = originalHttpOptions; // Restore after discovery
         }
-        console.log(`Discovered issuer ${issuer.issuer}`);
 
-        // Function to correct issuer metadata URLs
-        function correctIssuerMetadata(metadata, expectedBaseUrl) {
-          console.log('[OIDC Metadata] Original metadata:', JSON.stringify(metadata, null, 2));
-          const { protocol: expectedScheme, hostname: expectedHostname, port: expectedPort } = new URL(expectedBaseUrl);
-          const keysToCorrect = [
-            'issuer',
-            'token_endpoint',
-            'jwks_uri',
-            'userinfo_endpoint',
-            'authorization_endpoint',
-            'end_session_endpoint',
-            // Potentially others like 'registration_endpoint', 'revocation_endpoint', etc.
-            // For now, sticking to the ones explicitly mentioned or commonly problematic.
-          ];
-
-          const correctedMetadata = { ...metadata }; // Clone to avoid direct mutation issues if any
-
-          for (const key of keysToCorrect) {
-            if (correctedMetadata[key]) {
-              const originalUrl = correctedMetadata[key];
-              try {
-                const correctedUrlObj = new URL(originalUrl);
-                correctedUrlObj.protocol = expectedScheme;
-                correctedUrlObj.hostname = expectedHostname;
-                correctedUrlObj.port = expectedPort;
-                correctedMetadata[key] = correctedUrlObj.toString();
-                if (originalUrl !== correctedMetadata[key]) {
-                  console.log(`[OIDC Metadata] Corrected ${key}: ${originalUrl} -> ${correctedMetadata[key]}`);
-                } else {
-                  console.log(`[OIDC Metadata] No change needed for ${key}: ${originalUrl}`);
-                }
-              } catch (e) {
-                console.error(`[OIDC Metadata] Error correcting ${key} URL '${originalUrl}': ${e.message}. Skipping correction for this key.`);
-              }
-            }
-          }
-          console.log('[OIDC Metadata] Corrected metadata:', JSON.stringify(correctedMetadata, null, 2));
-          return correctedMetadata;
+        console.log('[OIDC Setup] Original issuer URL from discovery:', originalIssuer.issuer);
+        if (originalIssuer.metadata && originalIssuer.metadata.authorization_endpoint) {
+            console.log('[OIDC Setup] Original authorization_endpoint from discovery:', originalIssuer.metadata.authorization_endpoint);
+        } else {
+            console.log('[OIDC Setup] Original authorization_endpoint from discovery: Not found in metadata');
         }
 
-        // Correct the issuer metadata
-        issuer.metadata = correctIssuerMetadata(issuer.metadata, pingIssuerUrl);
+        // Correct the issuer metadata using the refined strategy
+        const correctedMetadata = correctIssuerMetadata(originalIssuer.metadata, pingIssuerUrl);
+        const correctedIssuer = new Issuer(correctedMetadata); // Create new Issuer with corrected metadata
 
-        oidcClient = new issuer.Client({ // Assign to the higher-scoped variable
+        console.log('[OIDC Setup] Corrected issuer URL via new Issuer instance:', correctedIssuer.issuer);
+        if (correctedIssuer.metadata && correctedIssuer.metadata.authorization_endpoint) {
+            console.log('[OIDC Setup] Corrected authorization_endpoint via new Issuer instance:', correctedIssuer.metadata.authorization_endpoint);
+        } else {
+            console.log('[OIDC Setup] Corrected authorization_endpoint via new Issuer instance: Not found in metadata');
+        }
+        console.log(`Using issuer for OIDC client: ${correctedIssuer.issuer}`);
+
+        oidcClient = new correctedIssuer.Client({ // Use correctedIssuer
           client_id: clientId,
           client_secret: clientSecret,
           redirect_uris: [redirectUri],
