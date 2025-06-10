@@ -14,6 +14,7 @@ let oidcClient; // Define oidcClient at a higher scope
 // --- Configuration Constants ---
 const port = process.env.BFF_PORT || 3001;
 const pingIssuerUrl = process.env.PING_ISSUER_URL;
+const pingBrowserFacingBaseUrl = process.env.PING_BROWSER_FACING_BASE_URL || ""; // Read new env var
 const clientId = process.env.PING_CLIENT_ID;
 const clientSecret = process.env.PING_CLIENT_SECRET;
 const sessionSecret = process.env.SESSION_SECRET;
@@ -32,6 +33,10 @@ function escapeHtml(unsafe) {
 // --- Main Server Startup Logic with OIDC Discovery ---
 async function startServer() {
   return new Promise((resolve, reject) => {
+    // Log OIDC base URLs at startup
+    console.log(`[OIDC Config] PING_ISSUER_URL (for BFF server-to-server calls): ${pingIssuerUrl}`);
+    console.log(`[OIDC Config] PING_BROWSER_FACING_BASE_URL (for browser redirects, optional): ${pingBrowserFacingBaseUrl || 'Not set, will use PING_ISSUER_URL or its localhost-corrected version'}`);
+
     if (!pingIssuerUrl || !clientId || !clientSecret || !sessionSecret ||
         !frontendOrigin || !frontendRedirectUrl || !bffBaseUrl) {
       const errorMsg = 'Missing critical environment variables. Please check your .env file. Ensure PING_ISSUER_URL, PING_CLIENT_ID, PING_CLIENT_SECRET, SESSION_SECRET, FRONTEND_ORIGIN, FRONTEND_REDIRECT_URL, and BFF_BASE_URL are set.';
@@ -55,31 +60,64 @@ async function startServer() {
       Issuer[custom.http_options] = (options) => ({ ...options, agent: customAgent });
     }
 
-    // Refined OIDC metadata correction function (Attempt 3)
-    function correctIssuerMetadata(metadata, expectedBaseUrlString) {
+    // OIDC metadata correction function using internal and browser-facing base URLs
+    function correctIssuerMetadata(metadata, internalBaseUrlString, browserFacingBaseUrlString) {
       const newMetadata = JSON.parse(JSON.stringify(metadata)); // Deep copy
-      const expectedUrlObj = new URL(expectedBaseUrlString);
+      const internalUrlObj = new URL(internalBaseUrlString);
+      let browserFacingUrlObj = null;
 
-      console.log('[OIDC Metadata Correction] Starting correction process. Expected base URL:', expectedBaseUrlString);
+      if (browserFacingBaseUrlString && browserFacingBaseUrlString.trim() !== "") {
+        try {
+          browserFacingUrlObj = new URL(browserFacingBaseUrlString);
+          console.log('[OIDC Metadata Correction] Using explicit browser-facing base URL:', browserFacingBaseUrlString);
+        } catch (e) {
+          console.warn(`[OIDC Metadata Correction] Invalid PING_BROWSER_FACING_BASE_URL '${browserFacingBaseUrlString}',_will fallback to internal or localhost-corrected internal URL for browser endpoints. Error: ${e.message}`);
+        }
+      } else {
+        console.log('[OIDC Metadata Correction] No explicit browser-facing base URL provided. Browser endpoints will use internal or localhost-corrected internal URL.');
+      }
+
+      const browserFacingKeys = ['authorization_endpoint', 'end_session_endpoint'];
+      // Add any custom PingFederate specific browser-facing endpoints if known, e.g. 'ping_end_session_endpoint'
+      // const customPingBrowserEndpoints = Object.keys(newMetadata).filter(k => k.startsWith('ping_') && k.endsWith('_endpoint'));
+      // browserFacingKeys.push(...customPingBrowserEndpoints);
+
+
+      console.log('[OIDC Metadata Correction] Starting correction process. Internal base URL:', internalBaseUrlString);
 
       for (const key of Object.keys(newMetadata)) {
         const currentValue = newMetadata[key];
-        if (typeof currentValue === 'string' && (currentValue.startsWith('http://localhost:') || currentValue.startsWith('https://localhost:'))) {
-          try {
-            let originalUrlObj = new URL(currentValue);
-            // Conditional Rewrite: Only change if original is localhost and expected is not localhost.
-            if (originalUrlObj.hostname === 'localhost' && expectedUrlObj.hostname !== 'localhost') {
-              originalUrlObj.protocol = expectedUrlObj.protocol;
-              originalUrlObj.hostname = expectedUrlObj.hostname;
-              originalUrlObj.port = expectedUrlObj.port;
-              newMetadata[key] = originalUrlObj.toString();
-              console.log(`[OIDC Metadata Correction] Conditionally corrected ${key}: ${currentValue} -> ${newMetadata[key]}`);
-            } else {
-              // console.log(`[OIDC Metadata Correction] No change needed for ${key} (${currentValue}) based on hostname conditions.`);
+        if (typeof currentValue !== 'string') {
+          continue; // Skip non-string values
+        }
+
+        try {
+          // Priority 1: Browser-facing URL correction if applicable and browserFacingUrlObj is valid
+          if (browserFacingKeys.includes(key) && browserFacingUrlObj) {
+            let urlToCorrect = new URL(currentValue); // Parse current value
+            urlToCorrect.protocol = browserFacingUrlObj.protocol;
+            urlToCorrect.hostname = browserFacingUrlObj.hostname;
+            urlToCorrect.port = browserFacingUrlObj.port;
+            newMetadata[key] = urlToCorrect.toString();
+            if (currentValue !== newMetadata[key]) {
+              console.log(`[OIDC Metadata Correction] Corrected BROWSER-FACING ${key}: ${currentValue} -> ${newMetadata[key]}`);
             }
-          } catch (e) {
-            console.error(`[OIDC Metadata Correction] Error processing ${key} URL '${currentValue}': ${e.message}. Skipping this key.`);
           }
+          // Priority 2: Internal localhost URL correction (if not already handled by browser-facing logic for that key)
+          else if (currentValue.startsWith('http://localhost:') || currentValue.startsWith('https://localhost:')) {
+            let originalUrlObj = new URL(currentValue);
+            if (originalUrlObj.hostname === 'localhost' && internalUrlObj.hostname !== 'localhost') {
+              originalUrlObj.protocol = internalUrlObj.protocol;
+              originalUrlObj.hostname = internalUrlObj.hostname;
+              originalUrlObj.port = internalUrlObj.port;
+              newMetadata[key] = originalUrlObj.toString();
+              if (currentValue !== newMetadata[key]) {
+                console.log(`[OIDC Metadata Correction] Corrected INTERNAL ${key}: ${currentValue} -> ${newMetadata[key]}`);
+              }
+            }
+          }
+        } catch (e) {
+          console.error(`[OIDC Metadata Correction] Error processing ${key} URL '${currentValue}': ${e.message}. Skipping this key.`);
         }
       }
       console.log('[OIDC Metadata Correction] Finished correction process. Resulting metadata:', JSON.stringify(newMetadata, null, 2));
@@ -99,8 +137,8 @@ async function startServer() {
             console.log('[OIDC Setup] Original authorization_endpoint from discovery: Not found in metadata');
         }
 
-        // Correct the issuer metadata using the refined strategy
-        const correctedMetadata = correctIssuerMetadata(originalIssuer.metadata, pingIssuerUrl);
+        // Correct the issuer metadata using the refined strategy with both base URLs
+        const correctedMetadata = correctIssuerMetadata(originalIssuer.metadata, pingIssuerUrl, pingBrowserFacingBaseUrl);
         const correctedIssuer = new Issuer(correctedMetadata); // Create new Issuer with corrected metadata
 
         console.log('[OIDC Setup] Corrected issuer URL via new Issuer instance:', correctedIssuer.issuer);
