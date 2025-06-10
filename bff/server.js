@@ -62,6 +62,49 @@ async function startServer() {
         }
         console.log(`Discovered issuer ${issuer.issuer}`);
 
+        // Function to correct issuer metadata URLs
+        function correctIssuerMetadata(metadata, expectedBaseUrl) {
+          console.log('[OIDC Metadata] Original metadata:', JSON.stringify(metadata, null, 2));
+          const { protocol: expectedScheme, hostname: expectedHostname, port: expectedPort } = new URL(expectedBaseUrl);
+          const keysToCorrect = [
+            'issuer',
+            'token_endpoint',
+            'jwks_uri',
+            'userinfo_endpoint',
+            'authorization_endpoint',
+            'end_session_endpoint',
+            // Potentially others like 'registration_endpoint', 'revocation_endpoint', etc.
+            // For now, sticking to the ones explicitly mentioned or commonly problematic.
+          ];
+
+          const correctedMetadata = { ...metadata }; // Clone to avoid direct mutation issues if any
+
+          for (const key of keysToCorrect) {
+            if (correctedMetadata[key]) {
+              const originalUrl = correctedMetadata[key];
+              try {
+                const correctedUrlObj = new URL(originalUrl);
+                correctedUrlObj.protocol = expectedScheme;
+                correctedUrlObj.hostname = expectedHostname;
+                correctedUrlObj.port = expectedPort;
+                correctedMetadata[key] = correctedUrlObj.toString();
+                if (originalUrl !== correctedMetadata[key]) {
+                  console.log(`[OIDC Metadata] Corrected ${key}: ${originalUrl} -> ${correctedMetadata[key]}`);
+                } else {
+                  console.log(`[OIDC Metadata] No change needed for ${key}: ${originalUrl}`);
+                }
+              } catch (e) {
+                console.error(`[OIDC Metadata] Error correcting ${key} URL '${originalUrl}': ${e.message}. Skipping correction for this key.`);
+              }
+            }
+          }
+          console.log('[OIDC Metadata] Corrected metadata:', JSON.stringify(correctedMetadata, null, 2));
+          return correctedMetadata;
+        }
+
+        // Correct the issuer metadata
+        issuer.metadata = correctIssuerMetadata(issuer.metadata, pingIssuerUrl);
+
         oidcClient = new issuer.Client({ // Assign to the higher-scoped variable
           client_id: clientId,
           client_secret: clientSecret,
