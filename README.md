@@ -8,52 +8,49 @@ The repository is structured as a monorepo:
 
 ## Architecture Flow (Simplified)
 
-```
-1. User clicks "Login" on Client App.
-   Client (Browser)  ---- Redirect to /login ----> BFF (Node.js/Express)
+``` mermaid
+sequenceDiagram
+    actor User
+    participant Browser as Client (Browser)
+    participant BFF as BFF (Node.js/Express)
+    participant PingFed as PingFederate Auth Server
 
-2. BFF's /login route serves an HTML confirmation page.
-   User sees "Confirm Login" page in browser.
-
-3. User clicks "Proceed to PingFederate" on confirmation page.
-   Browser  ---- GET request to /initiate-ping-login ----> BFF
-
-4. BFF's /initiate-ping-login route initiates OIDC flow.
-   BFF (Node.js/Express) -- Redirect to PingFederate --> PingFederate Auth Server
-
-3. User authenticates with PingFederate.
-   User <---- Authenticates ----> PingFederate Auth Server
-
-4. PingFederate redirects back to BFF with authorization code.
-   PingFederate Auth Server -- Redirect with code --> BFF (/auth/callback)
-
-6. BFF's /auth/callback route validates state, then displays an HTML page showing the authorization code.
-   User sees "Authorization Code Received" page in browser.
-
-7. User clicks "Exchange Code & Proceed" on this page.
-   Browser  ---- GET request to /exchange-code ----> BFF
-
-8. BFF's /exchange-code route exchanges the code (retrieved from session) for tokens, stores tokens and user info in session, sets session cookie.
-   BFF <---- OIDC Token Exchange ---- PingFederate Auth Server
-   BFF ---- Sets HTTP-Only Session Cookie ----> Client (Browser)
-
-9. BFF redirects user back to Client App.
-   BFF ---- Redirect ----> Client (Browser)
-
-10. Client requests user data from BFF.
-   Client (Browser) ---- GET /api/user (with session cookie) ----> BFF
-
-9. BFF validates session, returns user data.
-   BFF ---- Returns User JSON ----> Client (Browser)
-
-11. User clicks "Logout" on Client App.
-     Client (Browser) ---- Redirect to /logout ----> BFF
-
-12. BFF clears local session, initiates OIDC logout.
-      BFF ---- Redirect to PingFederate SLO ----> PingFederate Auth Server
-
-13. PingFederate logs out user, redirects back to Client App (via BFF's post_logout_redirect_uri).
-      PingFederate Auth Server ---- Redirect ----> Client (Browser)
+    %% Login Flow
+    User->>Browser: Clicks "Login"
+    Browser->>BFF: Redirect to /login
+    BFF->>Browser: Serves HTML confirmation page
+    Note over Browser: User sees "Confirm Login" page
+    
+    User->>Browser: Clicks "Proceed to PingFederate"
+    Browser->>BFF: GET /initiate-ping-login
+    BFF->>PingFed: Redirect to PingFederate (OIDC flow)
+    
+    User->>PingFed: Authenticates
+    PingFed->>User: Authentication
+    PingFed->>BFF: Redirect with authorization code to /auth/callback
+    
+    BFF->>Browser: Displays "Authorization Code Received" page
+    Note over Browser: User sees authorization code page
+    
+    User->>Browser: Clicks "Exchange Code & Proceed"
+    Browser->>BFF: GET /exchange-code
+    BFF->>PingFed: OIDC Token Exchange
+    PingFed->>BFF: Returns tokens
+    Note over BFF: Stores tokens and user info in session
+    BFF->>Browser: Sets HTTP-Only Session Cookie
+    BFF->>Browser: Redirect to Client App
+    
+    %% Authenticated Request
+    Browser->>BFF: GET /api/user (with session cookie)
+    Note over BFF: Validates session
+    BFF->>Browser: Returns User JSON
+    
+    %% Logout Flow
+    User->>Browser: Clicks "Logout"
+    Browser->>BFF: Redirect to /logout
+    Note over BFF: Clears local session
+    BFF->>PingFed: Redirect to PingFederate SLO
+    PingFed->>Browser: Redirect back to Client App
 ```
 
 ## Prerequisites
