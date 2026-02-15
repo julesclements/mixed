@@ -6,3 +6,4 @@ client/docs
 
 spa/dist
 spa/.env.development
+/.vscode/
