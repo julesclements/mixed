@@ -90,16 +90,21 @@ document.addEventListener('DOMContentLoaded', () => {
         let errorMsg = `Token Exchange Failed: ${exchangeError}`;
         if (correlationId) errorMsg += ` (Correlation ID: ${correlationId})`;
         alert(errorMsg); // Diagnostic dialogue
-        // Clean up the URL
-        window.history.replaceState({}, document.title, window.location.pathname);
     }
 
+    const loginStatus = urlParams.get('login_status');
+
     // Perform an automatic auth check on page load to update the UI
-    fetchUser(true);
+    fetchUser(true, loginStatus === 'success').then(() => {
+        // Clean up diagnostic parameters from the URL
+        if (exchangeError || loginStatus) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    });
 });
 
 
-const fetchUser = async (isSilent = false) => {
+const fetchUser = async (isSilent = false, expectedLogin = false) => {
     if (!userInfoDiv || !errorMessageDiv || !loginButton || !fetchUserButton || !logoutButton || !introspectionSection) {
         console.error('Required DOM elements not found in fetchUser.');
         return;
@@ -150,7 +155,15 @@ const fetchUser = async (isSilent = false) => {
         } else if (response.status === 401) {
             userInfoDiv.innerHTML = '';
             introspectionSection.innerHTML = '';
-            if (!isSilent) {
+
+            if (expectedLogin) {
+                const urlParams = new URLSearchParams(window.location.search);
+                const correlationId = urlParams.get('correlationId');
+                let diagMsg = `Session Diagnostic: The BFF reported a successful login, but the subsequent request to /api/user failed to provide a valid session.`;
+                if (correlationId) diagMsg += ` (Correlation ID: ${correlationId})`;
+                diagMsg += `\n\nThis often happens in cross-site scenarios where the browser blocks the session cookie (SameSite=None; Secure). Ensure that your browser is not blocking third-party cookies for ${new URL(bffBaseUrl).hostname}.`;
+                alert(diagMsg);
+            } else if (!isSilent) {
                 errorMessageDiv.textContent = 'Please login to view user information.';
             }
             loginButton.style.display = 'block';

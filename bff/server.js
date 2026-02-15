@@ -351,8 +351,13 @@ async function startServer() {
                 console.error(`Error saving session during exchange-code. Correlation ID: ${correlationId || 'N/A'}. Error: ${err.message}`);
                 return next(err);
               }
+              const redirectUrl = new URL(frontendRedirectUrl);
+              redirectUrl.searchParams.set('login_status', 'success');
+              if (correlationId) {
+                redirectUrl.searchParams.set('correlationId', correlationId);
+              }
               console.log(`Session saved successfully after token exchange. Redirecting to frontend. Correlation ID: ${correlationId || 'N/A'}`);
-              res.redirect(frontendRedirectUrl);
+              res.redirect(redirectUrl.toString());
             });
           } catch (err) {
             console.error(`Error in OIDC token exchange. Correlation ID: ${correlationId || 'N/A'}. Error: ${err.message}`, err.stack);
