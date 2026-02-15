@@ -34,10 +34,9 @@ jobs:
           context: ./bff # Path to the directory containing the Dockerfile and BFF code
           file: ./bff/Dockerfile # Explicit path to the Dockerfile
           push: true # Actually push the image
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/ping-bff:latest # Replace with your desired image name and tag
-          # Example with multiple tags (e.g., latest and git sha):
-          # tags: |
-          #   ${{ secrets.DOCKERHUB_USERNAME }}/ping-bff:latest
-          #   ${{ secrets.DOCKERHUB_USERNAME }}/ping-bff:${{ github.sha }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/ping-bff:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/ping-bff:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/ping-bff:${{ github.run_number }}
           # cache-from: type=gha
           # cache-to: type=gha,mode=max
