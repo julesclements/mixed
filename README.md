@@ -257,10 +257,11 @@ This section addresses common issues encountered when deploying the client and B
 ### Diagnosing the Issue
 
 1.  **Verify BFF Configuration for Production:**
-    *   Ensure `NODE_ENV` is set to `production` for your deployed BFF instance.
-    *   The session cookie settings in `bff/server.js` should then be active:
+        *   **CRITICAL:** Ensure `NODE_ENV` is set to `production` for your deployed BFF instance. If this is not set, the BFF will use `Lax` cookies which are NOT sent in cross-site `fetch` requests.
+        *   The session cookie settings in `bff/server.js` will then be active:
         *   `cookie.secure: true` (cookie is only sent over HTTPS).
-        *   `cookie.sameSite: 'None'` (this is necessary for cross-site cookie delivery, but requires `secure: true`).
+            *   `cookie.sameSite: 'None'` (necessary for cross-site cookie delivery, requires `secure: true`).
+            *   `cookie.partitioned: true` (Enables CHIPS - Cookies Having Independent Partitioned State). This helps modern browsers like Chrome allow the cookie in cross-site contexts when correctly partitioned.
     *   If your BFF is behind a reverse proxy that terminates TLS (handles HTTPS), ensure `app.set('trust proxy', 1);` is active in `bff/server.js` so Express correctly identifies the connection as secure.
     *   The BFF **must be served over HTTPS**.
 
@@ -299,7 +300,7 @@ This section addresses common issues encountered when deploying the client and B
             *   This approach makes the specific `/api/user` endpoint stateless from the BFF's session perspective, though the initial OIDC login flow with PingFederate would still use sessions at the BFF.
             *   This is a more significant refactor of the current BFF's `/api/user` logic.
     *   **Research Current Best Practices:** Browser policies around third-party cookies are evolving. Keep an eye on:
-        *   **CHIPS (Cookies Having Independent Partitioned State):** This allows cookies to be "partitioned" by the top-level site, potentially allowing them to be sent in some cross-site contexts if marked with the `Partitioned` attribute. Support and implementation details vary by browser.
+        *   **CHIPS (Cookies Having Independent Partitioned State):** This project now includes the `partitioned: true` attribute on the session cookie when in production mode. This allows the cookie to be "partitioned" by the top-level site (e.g., `github.io`), which allows it to be sent in cross-site requests to the BFF (e.g., `hdc.company`) in browsers that support CHIPS (like Chrome).
         *   Other proposals and standards in the Privacy Sandbox and similar initiatives.
 
 This troubleshooting guide should help in diagnosing and understanding potential production deployment issues related to cross-site cookie handling.

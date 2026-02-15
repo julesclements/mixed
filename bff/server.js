@@ -233,7 +233,8 @@ async function startServer() {
             secure: useSecureCookies,
             httpOnly: true,
             maxAge: 24 * 60 * 60 * 1000,
-            sameSite: useSecureCookies ? 'None' : 'Lax'
+            sameSite: useSecureCookies ? 'None' : 'Lax',
+            partitioned: useSecureCookies
           }
         }));
 

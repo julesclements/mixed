@@ -161,7 +161,7 @@ const fetchUser = async (isSilent = false, expectedLogin = false) => {
                 const correlationId = urlParams.get('correlationId');
                 let diagMsg = `Session Diagnostic: The BFF reported a successful login, but the subsequent request to /api/user failed to provide a valid session.`;
                 if (correlationId) diagMsg += ` (Correlation ID: ${correlationId})`;
-                diagMsg += `\n\nThis often happens in cross-site scenarios where the browser blocks the session cookie (SameSite=None; Secure). Ensure that your browser is not blocking third-party cookies for ${new URL(bffBaseUrl).hostname}.`;
+                diagMsg += `\n\nThis often happens in cross-site scenarios where the browser blocks the session cookie (SameSite=None; Secure). Ensure that your browser is not blocking third-party cookies for ${new URL(bffBaseUrl).hostname}. Also ensure that the BFF is running with NODE_ENV=production to enable secure cross-site cookies.`;
                 alert(diagMsg);
             } else if (!isSilent) {
                 errorMessageDiv.textContent = 'Please login to view user information.';
