@@ -344,8 +344,16 @@ async function startServer() {
             const tokenSet = await oidcClient.callback(redirectUri, storedParams, { state: storedParams.state });
             req.session.tokenSet = tokenSet;
             req.session.userInfo = tokenSet.claims();
-            console.log(`Tokens received and stored in session. Correlation ID: ${correlationId || 'N/A'}`);
-            res.redirect(frontendRedirectUrl);
+            console.log(`Tokens received and stored in session. Correlation ID: ${correlationId || 'N/A'}. Session ID: ${req.sessionID}`);
+
+            req.session.save((err) => {
+              if (err) {
+                console.error(`Error saving session during exchange-code. Correlation ID: ${correlationId || 'N/A'}. Error: ${err.message}`);
+                return next(err);
+              }
+              console.log(`Session saved successfully after token exchange. Redirecting to frontend. Correlation ID: ${correlationId || 'N/A'}`);
+              res.redirect(frontendRedirectUrl);
+            });
           } catch (err) {
             console.error(`Error in OIDC token exchange. Correlation ID: ${correlationId || 'N/A'}. Error: ${err.message}`, err.stack);
 
@@ -388,8 +396,12 @@ async function startServer() {
 
         app.get('/api/user', (req, res) => {
           const correlationIdFromHeader = req.headers['x-correlation-id'];
-          console.log(`/api/user hit. Correlation ID from header: ${correlationIdFromHeader || 'N/A'}`);
-          if (req.session.userInfo && req.session.tokenSet) {
+          const hasUserInfo = !!req.session.userInfo;
+          const hasTokenSet = !!req.session.tokenSet;
+
+          console.log(`/api/user hit. Correlation ID from header: ${correlationIdFromHeader || 'N/A'}. Session ID: ${req.sessionID}. Has userInfo: ${hasUserInfo}, Has tokenSet: ${hasTokenSet}`);
+
+          if (hasUserInfo && hasTokenSet) {
             res.json({
               message: "User is authenticated. Token details below.",
               id_token: req.session.tokenSet.id_token,
