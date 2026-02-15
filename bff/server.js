@@ -283,6 +283,30 @@ async function startServer() {
               return next(new Error('State mismatch or session state missing.'));
             }
             delete req.session.oidcState;
+
+            if (params.error) {
+              const errorDescription = params.error_description || 'No description provided.';
+              const errorCode = params.error;
+              console.error(`OIDC Error received in callback. Error: ${errorCode}. Description: ${errorDescription}. Correlation ID: ${correlationId || 'N/A'}`);
+
+              const errorPageHtml = `
+                <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Authentication Error</title><style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;background-color:#f4f4f4;color:#333}.container{background-color:#fff;padding:30px;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,0.1);text-align:center;max-width: 600px;}h1{color:#d9534f}p{color:#555;margin-bottom:10px}.diagnostic-info{background-color:#f8d7da;color:#721c24;border:1px solid #f5c6cb;padding:15px;border-radius:4px;margin-bottom:20px;text-align:left;word-break:break-all;font-family:monospace}.button{background-color:#007bff;color:white;padding:10px 20px;border:none;border-radius:5px;text-decoration:none;font-size:16px;cursor:pointer;display:inline-block}.button:hover{background-color:#0056b3}</style></head>
+                <body><div class="container"><h1>Authentication Error</h1>
+                <p>An error occurred during authentication with PingFederate.</p>
+                <div class="diagnostic-info">
+                  <strong>Error:</strong> ${escapeHtml(errorCode)}<br>
+                  <strong>Description:</strong> ${escapeHtml(errorDescription)}<br>
+                  ${correlationId ? `<strong>Correlation ID:</strong> ${escapeHtml(correlationId)}` : ''}
+                </div>
+                <p>Please check your configuration or contact support if the issue persists.</p>
+                <a href="/login${correlationId ? `?correlationId=${escapeHtml(correlationId)}` : ''}" class="button">Return to Login</a>
+                </div></body></html>`;
+
+              if (req.session.correlationId) delete req.session.correlationId;
+              return res.status(400).send(errorPageHtml);
+            }
+
             req.session.oidcCallbackParams = params;
             const authCode = params.code;
             const confirmationPageHtml = `
@@ -319,7 +343,21 @@ async function startServer() {
             res.redirect(frontendRedirectUrl);
           } catch (err) {
             console.error(`Error in OIDC token exchange. Correlation ID: ${correlationId || 'N/A'}. Error: ${err.message}`, err.stack);
-            res.status(500).send(`OIDC token exchange error: ${err.message}. <a href="/login">Retry</a>`);
+
+            const errorPageHtml = `
+              <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Token Exchange Error</title><style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;background-color:#f4f4f4;color:#333}.container{background-color:#fff;padding:30px;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,0.1);text-align:center;max-width: 600px;}h1{color:#d9534f}p{color:#555;margin-bottom:10px}.diagnostic-info{background-color:#f8d7da;color:#721c24;border:1px solid #f5c6cb;padding:15px;border-radius:4px;margin-bottom:20px;text-align:left;word-break:break-all;font-family:monospace}.button{background-color:#007bff;color:white;padding:10px 20px;border:none;border-radius:5px;text-decoration:none;font-size:16px;cursor:pointer;display:inline-block}.button:hover{background-color:#0056b3}</style></head>
+              <body><div class="container"><h1>Token Exchange Error</h1>
+              <p>An error occurred while exchanging the authorization code for tokens.</p>
+              <div class="diagnostic-info">
+                <strong>Error:</strong> ${escapeHtml(err.message)}<br>
+                ${correlationId ? `<strong>Correlation ID:</strong> ${escapeHtml(correlationId)}` : ''}
+              </div>
+              <p>This could be due to an expired code or a configuration issue. Please try logging in again.</p>
+              <a href="/login${correlationId ? `?correlationId=${escapeHtml(correlationId)}` : ''}" class="button">Return to Login</a>
+              </div></body></html>`;
+
+            res.status(500).send(errorPageHtml);
           }
         });
 
