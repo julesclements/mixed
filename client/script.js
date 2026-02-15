@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (errorMessageDiv) errorMessageDiv.textContent = '';
     if (introspectionSection) introspectionSection.innerHTML = '';
     if (loginButton) loginButton.style.display = 'block';
-    if (fetchUserButton) fetchUserButton.style.display = 'block';
+    if (fetchUserButton) fetchUserButton.style.display = 'none';
     if (logoutButton) logoutButton.style.display = 'none';
 
     // Check for diagnostic errors from BFF
@@ -154,7 +154,7 @@ const fetchUser = async (isSilent = false) => {
                 errorMessageDiv.textContent = 'Please login to view user information.';
             }
             loginButton.style.display = 'block';
-            fetchUserButton.style.display = 'block';
+            fetchUserButton.style.display = 'none';
             logoutButton.style.display = 'none';
         } else {
             const errorText = await response.text();
@@ -164,7 +164,7 @@ const fetchUser = async (isSilent = false) => {
                 errorMessageDiv.textContent = `Error fetching user: ${response.status} ${errorText || response.statusText}`;
             }
             loginButton.style.display = 'block';
-            fetchUserButton.style.display = 'block';
+            fetchUserButton.style.display = 'none';
             logoutButton.style.display = 'none';
         }
     } catch (error) {
@@ -175,7 +175,7 @@ const fetchUser = async (isSilent = false) => {
             errorMessageDiv.textContent = 'Network error or server is unavailable. Please try again later.';
         }
         loginButton.style.display = 'block';
-        fetchUserButton.style.display = 'block';
+        fetchUserButton.style.display = 'none';
         logoutButton.style.display = 'none';
     }
 };
