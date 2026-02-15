@@ -81,10 +81,25 @@ document.addEventListener('DOMContentLoaded', () => {
     if (loginButton) loginButton.style.display = 'block';
     if (fetchUserButton) fetchUserButton.style.display = 'block';
     if (logoutButton) logoutButton.style.display = 'none';
+
+    // Check for diagnostic errors from BFF
+    const urlParams = new URLSearchParams(window.location.search);
+    const exchangeError = urlParams.get('exchange_error');
+    if (exchangeError) {
+        const correlationId = urlParams.get('correlationId');
+        let errorMsg = `Token Exchange Failed: ${exchangeError}`;
+        if (correlationId) errorMsg += ` (Correlation ID: ${correlationId})`;
+        alert(errorMsg); // Diagnostic dialogue
+        // Clean up the URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // Perform an automatic auth check on page load to update the UI
+    fetchUser(true);
 });
 
 
-const fetchUser = async () => {
+const fetchUser = async (isSilent = false) => {
     if (!userInfoDiv || !errorMessageDiv || !loginButton || !fetchUserButton || !logoutButton || !introspectionSection) {
         console.error('Required DOM elements not found in fetchUser.');
         return;
@@ -130,12 +145,14 @@ const fetchUser = async () => {
 
             errorMessageDiv.textContent = '';
             loginButton.style.display = 'none';
-            fetchUserButton.style.display = 'none';
+            fetchUserButton.style.display = 'block'; // Keep fetch button visible to allow refreshing
             logoutButton.style.display = 'block';
         } else if (response.status === 401) {
             userInfoDiv.innerHTML = '';
             introspectionSection.innerHTML = '';
-            errorMessageDiv.textContent = 'Please login to view user information.';
+            if (!isSilent) {
+                errorMessageDiv.textContent = 'Please login to view user information.';
+            }
             loginButton.style.display = 'block';
             fetchUserButton.style.display = 'block';
             logoutButton.style.display = 'none';
@@ -143,7 +160,9 @@ const fetchUser = async () => {
             const errorText = await response.text();
             userInfoDiv.innerHTML = '';
             introspectionSection.innerHTML = '';
-            errorMessageDiv.textContent = `Error fetching user: ${response.status} ${errorText || response.statusText}`;
+            if (!isSilent) {
+                errorMessageDiv.textContent = `Error fetching user: ${response.status} ${errorText || response.statusText}`;
+            }
             loginButton.style.display = 'block';
             fetchUserButton.style.display = 'block';
             logoutButton.style.display = 'none';
@@ -152,7 +171,9 @@ const fetchUser = async () => {
         console.error('Fetch user error:', error);
         userInfoDiv.innerHTML = '';
         introspectionSection.innerHTML = '';
-        errorMessageDiv.textContent = 'Network error or server is unavailable. Please try again later.';
+        if (!isSilent) {
+            errorMessageDiv.textContent = 'Network error or server is unavailable. Please try again later.';
+        }
         loginButton.style.display = 'block';
         fetchUserButton.style.display = 'block';
         logoutButton.style.display = 'none';

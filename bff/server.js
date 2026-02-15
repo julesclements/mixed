@@ -217,18 +217,23 @@ async function startServer() {
         app.use(express.json()); // Middleware to parse JSON bodies
 
         const isProduction = process.env.NODE_ENV === 'production';
-        if (isProduction) {
+        const isHttps = bffBaseUrl.startsWith('https://');
+        const useSecureCookies = isProduction || isHttps;
+
+        if (useSecureCookies) {
           app.set('trust proxy', 1);
+          console.log('[Session] Trust proxy enabled and secure cookies will be used (HTTPS or production).');
         }
+
         app.use(session({
           secret: sessionSecret,
           resave: false,
           saveUninitialized: false,
           cookie: {
-            secure: isProduction,
+            secure: useSecureCookies,
             httpOnly: true,
             maxAge: 24 * 60 * 60 * 1000,
-            sameSite: isProduction ? 'None' : 'Lax'
+            sameSite: useSecureCookies ? 'None' : 'Lax'
           }
         }));
 
@@ -344,20 +349,13 @@ async function startServer() {
           } catch (err) {
             console.error(`Error in OIDC token exchange. Correlation ID: ${correlationId || 'N/A'}. Error: ${err.message}`, err.stack);
 
-            const errorPageHtml = `
-              <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>Token Exchange Error</title><style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;background-color:#f4f4f4;color:#333}.container{background-color:#fff;padding:30px;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,0.1);text-align:center;max-width: 600px;}h1{color:#d9534f}p{color:#555;margin-bottom:10px}.diagnostic-info{background-color:#f8d7da;color:#721c24;border:1px solid #f5c6cb;padding:15px;border-radius:4px;margin-bottom:20px;text-align:left;word-break:break-all;font-family:monospace}.button{background-color:#007bff;color:white;padding:10px 20px;border:none;border-radius:5px;text-decoration:none;font-size:16px;cursor:pointer;display:inline-block}.button:hover{background-color:#0056b3}</style></head>
-              <body><div class="container"><h1>Token Exchange Error</h1>
-              <p>An error occurred while exchanging the authorization code for tokens.</p>
-              <div class="diagnostic-info">
-                <strong>Error:</strong> ${escapeHtml(err.message)}<br>
-                ${correlationId ? `<strong>Correlation ID:</strong> ${escapeHtml(correlationId)}` : ''}
-              </div>
-              <p>This could be due to an expired code or a configuration issue. Please try logging in again.</p>
-              <a href="/login${correlationId ? `?correlationId=${escapeHtml(correlationId)}` : ''}" class="button">Return to Login</a>
-              </div></body></html>`;
-
-            res.status(500).send(errorPageHtml);
+            const redirectUrl = new URL(frontendRedirectUrl);
+            redirectUrl.searchParams.set('exchange_error', err.message);
+            if (correlationId) {
+                redirectUrl.searchParams.set('correlationId', correlationId);
+            }
+            console.log(`Redirecting to frontend with exchange error. URL: ${redirectUrl.toString()}`);
+            res.redirect(redirectUrl.toString());
           }
         });
 
