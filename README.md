@@ -5,53 +5,9 @@ This project demonstrates a client-server architecture where a frontend client a
 The repository is structured as a monorepo:
 -   `/client`: Contains the static frontend Javascript application.
 -   `/bff`: Contains the Node.js/Express Backend-for-Frontend (BFF) application.
+-   `/spa`: ??
 
-## Architecture Flow (Simplified)
-
-``` mermaid
-sequenceDiagram
-    actor User
-    participant Browser as Client (Browser)
-    participant BFF as BFF (Node.js/Express)
-    participant PingFed as PingFederate Auth Server
-
-    %% Login Flow
-    User->>Browser: Clicks "Login"
-    Browser->>BFF: Redirect to /login
-    BFF->>Browser: Serves HTML confirmation page
-    Note over Browser: User sees "Confirm Login" page
-    
-    User->>Browser: Clicks "Proceed to PingFederate"
-    Browser->>BFF: GET /initiate-ping-login
-    BFF->>PingFed: Redirect to PingFederate (OIDC flow)
-    
-    User->>PingFed: Authenticates
-    PingFed->>User: Authentication
-    PingFed->>BFF: Redirect with authorization code to /auth/callback
-    
-    BFF->>Browser: Displays "Authorization Code Received" page
-    Note over Browser: User sees authorization code page
-    
-    User->>Browser: Clicks "Exchange Code & Proceed"
-    Browser->>BFF: GET /exchange-code
-    BFF->>PingFed: OIDC Token Exchange
-    PingFed->>BFF: Returns tokens
-    Note over BFF: Stores tokens and user info in session
-    BFF->>Browser: Sets HTTP-Only Session Cookie
-    BFF->>Browser: Redirect to Client App
-    
-    %% Authenticated Request
-    Browser->>BFF: GET /api/user (with session cookie)
-    Note over BFF: Validates session
-    BFF->>Browser: Returns User JSON
-    
-    %% Logout Flow
-    User->>Browser: Clicks "Logout"
-    Browser->>BFF: Redirect to /logout
-    Note over BFF: Clears local session
-    BFF->>PingFed: Redirect to PingFederate SLO
-    PingFed->>Browser: Redirect back to Client App
-```
+For flow overview see [[BFF] Backend-for-Frontend for PingIdentity](https://v8lust.atlassian.net/wiki/x/AgDoIg).
 
 ## Prerequisites
 
@@ -415,40 +371,3 @@ The BFF exposes the following API endpoints that the client interacts with (afte
         *   **Authorization Redirect (Browser to PingFederate):** When the BFF redirects the user's browser to PingFederate's authorization endpoint (e.g., `/as/authorization.oauth2`), the `X-Correlation-ID` (even if passed to the BFF's `/login` or `/initiate-ping-login` routes) cannot be injected by the BFF as an HTTP header into this redirect, as it's a standard browser navigation initiated by the user agent. The ID is logged by the BFF during these initiation steps.
     *   This forwarding of the `X-Correlation-ID` in backchannel requests (where possible) can be very useful if PingFederate's audit logs or its detailed request logging is configured to capture and display custom HTTP headers, aiding in end-to-end tracing of a specific user interaction.
 *   **Security Note on Client-Side Token Decoding:** The client-side decoding of JWTs (ID Token, Access Token) is **for display and informational purposes only**. The client **must not** use any information decoded from these tokens to make security decisions or to grant access to resources. All token validation (signatures, expiry, claims) and authorization decisions are the responsibility of the Backend-for-Frontend (BFF).
-
-### /client Authentication Flow (Mermaid Diagram)
-
-```mermaid
-sequenceDiagram
-     actor User
-     participant Browser as Client (Browser)
-     participant BFF as BFF (Node.js/Express)
-     participant PingFed as PingFederate
-
-     User->>Browser: Clicks Login
-     Browser->>BFF: GET /login?correlationId
-     BFF->>Browser: Confirmation page
-     User->>Browser: Clicks Proceed
-     Browser->>BFF: GET /initiate-ping-login
-     BFF->>PingFed: Redirect to PingFederate
-     User->>PingFed: Authenticate
-     PingFed->>BFF: Redirect with code
-     BFF->>Browser: Auth code page
-     User->>Browser: Clicks Exchange Code
-     Browser->>BFF: GET /exchange-code
-     BFF->>PingFed: Token exchange
-     PingFed->>BFF: Returns tokens
-     BFF->>Browser: Redirect to /client
-     Browser->>BFF: GET /api/user (with session cookie, X-Correlation-ID)
-     BFF->>Browser: Returns user info, tokens
-     Browser->>User: Shows decoded tokens
-     User->>Browser: Clicks Introspect (if access token is opaque)
-     Browser->>BFF: POST /api/introspect-token (with access token, X-Correlation-ID)
-     BFF->>PingFed: Introspect token
-     PingFed->>BFF: Returns introspection result
-     BFF->>Browser: Returns introspection result
-     User->>Browser: Clicks Logout
-     Browser->>BFF: GET /logout?correlationId
-     BFF->>PingFed: End session
-     PingFed->>Browser: Redirect to /client
-```
