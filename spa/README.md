@@ -1,5 +1,7 @@
 # PingFederate Authentication App
 
+> For deployment guidance, see parent readme.
+
 A minimal Node.js application that demonstrates authentication with PingFederate and displays the authorization code after successful sign-in.
 
 ## Features
