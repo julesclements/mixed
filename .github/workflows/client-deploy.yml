@@ -2,8 +2,6 @@ name: Deploy Client to GitHub Pages
 
 on:
   push:
-    branches:
-      - main # Or master, depending on your repository's default branch
     paths: # Trigger workflow only if files in 'client/**' or the workflow file itself change
       - 'client/**'
       - '.github/workflows/client-deploy.yml'
