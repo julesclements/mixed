@@ -57,9 +57,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
         bffBaseUrl = 'http://localhost:3001';
         console.log('Client running locally, BFF assumed at:', bffBaseUrl);
-    } else if (hostname === 'julesclements.github.io') {
+    } else if (hostname === 'julesclements.github.io' || hostname === 'client.hdc.company') {
         bffBaseUrl = 'https://mixed.hdc.company';
-        console.log('Client running on GitHub Pages, BFF set to:', bffBaseUrl);
+        console.log('Client running on known production domain, BFF set to:', bffBaseUrl);
     } else {
         bffBaseUrl = '';
         console.log('Client running on other hostname, BFF assumed same-origin or proxied.');
