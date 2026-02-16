@@ -27,6 +27,7 @@ A minimal Node.js application that demonstrates authentication with PingFederate
 
     CLIENT_ID=your_client_id
     PING_BASE_URL=https://your-pingfederate-server
+    VITE_SPA_PORT=5173
 
 ## Running the application
 
@@ -34,7 +35,7 @@ Start the development server:
 
     npm run dev
 
-The application will be available at `http://localhost:5173`.
+The application will be available at `http://localhost:5173` (or the port specified by `VITE_SPA_PORT`).
 
 ## PingFederate Setup
 
