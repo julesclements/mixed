@@ -34,14 +34,13 @@ jobs:
           context: ./spa # Context is the spa directory
           file: ./spa/Dockerfile # Path to the spa's Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/ping-spa:latest # Example image name, user can customize
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/ping-spa:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/ping-spa:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/ping-spa:${{ github.run_number }}
           build-args: |
             VITE_STAFF_CLIENT_ID=${{ vars.VITE_STAFF_CLIENT_ID }}
             VITE_CUSTOMER_CLIENT_ID=${{ vars.VITE_CUSTOMER_CLIENT_ID }}
             VITE_PING_BASE_URL=${{ vars.VITE_PING_BASE_URL }}
-          # To add more tags, like git sha:
-          # tags: |
-          #   ${{ secrets.DOCKERHUB_USERNAME }}/ping-spa:latest
-          #   ${{ secrets.DOCKERHUB_USERNAME }}/ping-spa:${{ github.sha }}
           # cache-from: type=gha
           # cache-to: type=gha,mode=max
