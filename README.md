@@ -5,7 +5,7 @@ This project demonstrates a client-server architecture where a frontend client a
 The repository is structured as a monorepo:
 -   `/client`: Contains the static frontend Javascript application.
 -   `/bff`: Contains the Node.js/Express Backend-for-Frontend (BFF) application.
--   `/spa`: ??
+-   `/spa`: Contains a React/TypeScript Single Page Application (SPA) that demonstrates OIDC authentication using Vite and Tailwind CSS.
 
 For flow overview see [[BFF] Backend-for-Frontend for PingIdentity](https://v8lust.atlassian.net/wiki/x/AgDoIg).
 
@@ -20,6 +20,36 @@ For flow overview see [[BFF] Backend-for-Frontend for PingIdentity](https://v8lu
         *   **Redirect URI:** Pointing to the BFF's callback endpoint (e.g., `http://localhost:3001/auth/callback` for local dev, or your production BFF's callback URL).
         *   **Grant Type:** Authorization Code.
         *   (Optional but Recommended) **PKCE:** While `openid-client` supports it, ensure your PingFederate client settings are compatible if PKCE is enforced.
+
+## Environment Variables
+
+This project uses environment variables for configuration. You should create `.env` files in the respective directories.
+
+### Backend-for-Frontend (`/bff/.env`)
+
+| Variable | Description |
+| :--- | :--- |
+| `PING_CLIENT_ID` | Your OIDC Client ID for the BFF application from PingFederate. |
+| `PING_CLIENT_SECRET` | The client secret for your BFF application. |
+| `PING_ISSUER_URL` | The issuer URI of your PingFederate server (e.g., `https://ping.hdc.company`). |
+| `PING_BROWSER_FACING_BASE_URL` | (Optional) The base URL for PingFederate as seen by the user's browser. |
+| `SESSION_SECRET` | A long, random, and secure string used to sign the session ID cookie. |
+| `BFF_PORT` | The port on which the BFF server will listen (default is `3001`). |
+| `BFF_BASE_URL` | The base URL where the BFF itself is running (e.g., `http://localhost:3001`). |
+| `FRONTEND_ORIGIN` | The exact origin of your client application (e.g., `http://localhost:1234`). |
+| `FRONTEND_REDIRECT_URL` | The full URL where the BFF should redirect after login/logout. |
+| `ALLOW_SELF_SIGNED_CERTS` | Set to `true` to bypass certificate validation (development only). |
+| `NODE_ENV` | Set to `production` to enable secure cookie attributes. |
+
+### Single Page Application (`/spa/.env`)
+
+| Variable | Description |
+| :--- | :--- |
+| `VITE_STAFF_CLIENT_ID` | OIDC Client ID for staff login. |
+| `VITE_CUSTOMER_CLIENT_ID` | OIDC Client ID for customer login. |
+| `VITE_PING_BASE_URL` | The authorization endpoint for PingFederate. |
+| `VITE_BFF_BASE_URL` | The base URL of the BFF server. |
+| `VITE_SPA_PORT` | The port on which the SPA development server will listen (default is `5173`). |
 
 ## BFF Setup (`/bff` directory)
 
