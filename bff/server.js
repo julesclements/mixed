@@ -21,8 +21,8 @@ const clientSecret = process.env.PING_CLIENT_SECRET;
 const sessionSecret = process.env.SESSION_SECRET;
 const bffBaseUrl = process.env.BFF_BASE_URL || `http://localhost:${port}`;
 const redirectUri = `${bffBaseUrl}/auth/callback`;
-const frontendOrigin = process.env.FRONTEND_ORIGIN;
-const frontendRedirectUrl = process.env.FRONTEND_REDIRECT_URL;
+const allowedOrigins = process.env.FRONTEND_ORIGIN ? process.env.FRONTEND_ORIGIN.split(',').map(o => o.trim()) : [];
+const allowedRedirectUrls = process.env.FRONTEND_REDIRECT_URL ? process.env.FRONTEND_REDIRECT_URL.split(',').map(u => u.trim()) : [];
 const allowSelfSignedCerts = process.env.ALLOW_SELF_SIGNED_CERTS === 'true';
 
 // --- Helper Functions ---
@@ -39,7 +39,7 @@ async function startServer() {
     console.log(`[OIDC Config] PING_BROWSER_FACING_BASE_URL (for browser redirects, optional): ${pingBrowserFacingBaseUrl || 'Not set, will use PING_ISSUER_URL or its localhost-corrected version'}`);
 
     if (!pingIssuerUrl || !clientId || !clientSecret || !sessionSecret ||
-        !frontendOrigin || !frontendRedirectUrl || !bffBaseUrl) {
+        allowedOrigins.length === 0 || allowedRedirectUrls.length === 0 || !bffBaseUrl) {
       const errorMsg = 'Missing critical environment variables. Please check your .env file. Ensure PING_ISSUER_URL, PING_CLIENT_ID, PING_CLIENT_SECRET, SESSION_SECRET, FRONTEND_ORIGIN, FRONTEND_REDIRECT_URL, and BFF_BASE_URL are set.';
       console.error(errorMsg);
       return reject(new Error(errorMsg)); // Reject promise if config is missing
@@ -210,7 +210,15 @@ async function startServer() {
         // --- Express Middleware Setup (Should be configured before routes) ---
         // CORS options - critical for cross-site requests
         const corsOptions = {
-          origin: frontendOrigin, // Use frontendOrigin for CORS
+          origin: function (origin, callback) {
+            // Allow requests with no origin (like mobile apps or curl requests)
+            if (!origin || allowedOrigins.includes(origin)) {
+              callback(null, true);
+            } else {
+              console.warn(`[CORS] Origin ${origin} not allowed by configuration.`);
+              callback(new Error('Not allowed by CORS'));
+            }
+          },
           credentials: true, // Allow cookies to be sent
           methods: ['GET', 'POST', 'OPTIONS'],
           allowedHeaders: ['Content-Type', 'X-Correlation-ID'],
@@ -253,7 +261,8 @@ async function startServer() {
 
         app.get('/login', (req, res) => {
           const correlationId = req.query.correlationId;
-          console.log(`/login route hit. Correlation ID from query: ${correlationId || 'N/A'}`);
+          const returnTo = req.query.returnTo;
+          console.log(`/login route hit. Correlation ID from query: ${correlationId || 'N/A'}, returnTo: ${returnTo || 'N/A'}`);
           const confirmationPageHtml = `
             <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Confirm Login</title><style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;background-color:#f4f4f4;color:#333}.container{background-color:#fff;padding:30px;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,0.1);text-align:center}h1{color:#333}p{color:#555;margin-bottom:20px}.scopes{font-size:0.9em;color:#666;margin-bottom:25px}.button{background-color:#007bff;color:white;padding:10px 20px;border:none;border-radius:5px;text-decoration:none;font-size:16px;cursor:pointer}.button:hover{background-color:#0056b3}</style></head>
@@ -261,6 +270,7 @@ async function startServer() {
             <p class="scopes">This application will request access to the following information: <strong>${requestedScopes.join(', ')}</strong>.</p>
             <form action="/initiate-ping-login" method="GET">
               ${correlationId ? `<input type="hidden" name="correlationId" value="${escapeHtml(correlationId)}" />` : ''}
+              ${returnTo ? `<input type="hidden" name="returnTo" value="${escapeHtml(returnTo)}" />` : ''}
               <button type="submit" class="button">Proceed to PingFederate</button>
             </form>
             </div></body></html>`;
@@ -270,7 +280,18 @@ async function startServer() {
         app.get('/initiate-ping-login', (req, res, next) => {
           if (!oidcClient) return next(new Error('OIDC client not initialized.'));
           const correlationId = req.query.correlationId;
-          console.log(`Initiating OIDC login. Correlation ID from query: ${correlationId || 'N/A'}`);
+          const returnTo = req.query.returnTo;
+          console.log(`Initiating OIDC login. Correlation ID from query: ${correlationId || 'N/A'}, returnTo: ${returnTo || 'N/A'}`);
+
+          if (returnTo) {
+            if (allowedRedirectUrls.includes(returnTo)) {
+              req.session.returnTo = returnTo;
+              console.log(`Stored validated returnTo in session: ${returnTo}`);
+            } else {
+              console.warn(`[Login] Provided returnTo URL '${returnTo}' is not in the allowlist.`);
+            }
+          }
+
           const state = crypto.randomBytes(16).toString('hex');
           req.session.oidcState = state;
           if (correlationId) {
@@ -359,7 +380,8 @@ async function startServer() {
               // Log session cookie details for debugging cross-site issues
               console.log(`Session saved successfully. Setting session cookie with secure=${useSecureCookies}, sameSite=${'None'}`);
               
-              const redirectUrl = new URL(frontendRedirectUrl);
+              const frontendUrl = req.session.returnTo || allowedRedirectUrls[0];
+              const redirectUrl = new URL(frontendUrl);
               redirectUrl.searchParams.set('login_status', 'success');
               if (correlationId) {
                 redirectUrl.searchParams.set('correlationId', correlationId);
@@ -372,7 +394,8 @@ async function startServer() {
           } catch (err) {
             console.error(`Error in OIDC token exchange. Correlation ID: ${correlationId || 'N/A'}. Error: ${err.message}`, err.stack);
 
-            const redirectUrl = new URL(frontendRedirectUrl);
+            const frontendUrl = req.session.returnTo || allowedRedirectUrls[0];
+            const redirectUrl = new URL(frontendUrl);
             redirectUrl.searchParams.set('exchange_error', err.message);
             if (correlationId) {
                 redirectUrl.searchParams.set('correlationId', correlationId);
@@ -517,7 +540,12 @@ async function startServer() {
 
         app.get('/logout', async (req, res, next) => {
           const correlationId = req.session.correlationId || req.query.correlationId;
-          console.log(`/logout hit. Correlation ID: ${correlationId || 'N/A'}`);
+          const returnTo = req.query.returnTo || req.session.returnTo || allowedRedirectUrls[0];
+          console.log(`/logout hit. Correlation ID: ${correlationId || 'N/A'}, returnTo: ${returnTo}`);
+
+          // Validate returnTo if it came from query
+          const finalReturnTo = allowedRedirectUrls.includes(returnTo) ? returnTo : allowedRedirectUrls[0];
+
           if (!oidcClient) return next(new Error('OIDC client not initialized.'));
           const idToken = req.session.tokenSet ? req.session.tokenSet.id_token : undefined;
           req.session.destroy(err => {
@@ -526,12 +554,12 @@ async function startServer() {
               return next(err);
             }
             try {
-              const endSessionUrl = oidcClient.endSessionUrl({ id_token_hint: idToken, post_logout_redirect_uri: frontendRedirectUrl });
+              const endSessionUrl = oidcClient.endSessionUrl({ id_token_hint: idToken, post_logout_redirect_uri: finalReturnTo });
               console.log(`Redirecting to PingFederate end session URL. Correlation ID: ${correlationId || 'N/A'}. URL: ${endSessionUrl}`);
               res.redirect(endSessionUrl);
             } catch(e) {
               console.warn(`Could not construct end_session_url. Correlation ID: ${correlationId || 'N/A'}. Error: ${e.message}`);
-              res.redirect(frontendRedirectUrl);
+              res.redirect(finalReturnTo);
             }
           });
         });
