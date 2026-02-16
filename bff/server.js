@@ -208,10 +208,14 @@ async function startServer() {
         });
 
         // --- Express Middleware Setup (Should be configured before routes) ---
-        // CORS options
+        // CORS options - critical for cross-site requests
         const corsOptions = {
           origin: frontendOrigin, // Use frontendOrigin for CORS
-          credentials: true,
+          credentials: true, // Allow cookies to be sent
+          methods: ['GET', 'POST', 'OPTIONS'],
+          allowedHeaders: ['Content-Type', 'X-Correlation-ID'],
+          exposedHeaders: ['Set-Cookie'], // Expose Set-Cookie header to client
+          maxAge: 86400, // 24 hours
         };
         app.use(cors(corsOptions)); // Enable CORS with options
         app.use(express.json()); // Middleware to parse JSON bodies
@@ -228,14 +232,14 @@ async function startServer() {
         app.use(session({
           secret: sessionSecret,
           resave: false,
-          saveUninitialized: false,
+          saveUninitialized: true, // Changed to true to create session before redirect
           cookie: {
             secure: useSecureCookies,
             httpOnly: true,
             maxAge: 24 * 60 * 60 * 1000,
             sameSite: useSecureCookies ? 'None' : 'Lax',
-            // Optionally set domain: '.hdc.company' if you want to share cookies across subdomains
-            // domain: '.hdc.company'
+            // Cross-site scenarios require SameSite=None; Secure
+            // Note: Browsers will block third-party cookies unless explicitly allowed
           }
         }));
 
@@ -334,14 +338,13 @@ async function startServer() {
         app.get('/exchange-code', async (req, res, next) => {
           if (!oidcClient) return next(new Error('OIDC client not initialized.'));
           const correlationId = req.session.correlationId;
-          console.log(`/exchange-code hit. Correlation ID from session: ${correlationId || 'N/A'}`);
+          console.log(`/exchange-code (GET) hit. Correlation ID from session: ${correlationId || 'N/A'}`);
           const storedParams = req.session.oidcCallbackParams;
           if (!storedParams) {
             if (req.session.correlationId) delete req.session.correlationId;
             return res.redirect('/login');
           }
           delete req.session.oidcCallbackParams;
-          if (req.session.correlationId) delete req.session.correlationId;
           try {
             const tokenSet = await oidcClient.callback(redirectUri, storedParams, { state: storedParams.state });
             req.session.tokenSet = tokenSet;
@@ -353,12 +356,17 @@ async function startServer() {
                 console.error(`Error saving session during exchange-code. Correlation ID: ${correlationId || 'N/A'}. Error: ${err.message}`);
                 return next(err);
               }
+              // Log session cookie details for debugging cross-site issues
+              console.log(`Session saved successfully. Setting session cookie with secure=${useSecureCookies}, sameSite=${'None'}`);
+              
               const redirectUrl = new URL(frontendRedirectUrl);
               redirectUrl.searchParams.set('login_status', 'success');
               if (correlationId) {
                 redirectUrl.searchParams.set('correlationId', correlationId);
               }
-              console.log(`Session saved successfully after token exchange. Redirecting to frontend. Correlation ID: ${correlationId || 'N/A'}`);
+              // Also pass session ID for debugging if needed
+              redirectUrl.searchParams.set('sessionId', req.sessionID);
+              console.log(`Session saved successfully after token exchange. Redirecting to frontend. Correlation ID: ${correlationId || 'N/A'}. Frontend URL: ${redirectUrl.toString()}`);
               res.redirect(redirectUrl.toString());
             });
           } catch (err) {
@@ -371,6 +379,59 @@ async function startServer() {
             }
             console.log(`Redirecting to frontend with exchange error. URL: ${redirectUrl.toString()}`);
             res.redirect(redirectUrl.toString());
+          }
+        });
+
+        // New POST endpoint for token exchange from SPA
+        // SPA sends authorization code and code_verifier, BFF keeps access token server-side
+        app.post('/exchange-code', async (req, res, next) => {
+          if (!oidcClient) return next(new Error('OIDC client not initialized.'));
+          
+          const { code, code_verifier, client_id } = req.body;
+          const correlationIdFromHeader = req.headers['x-correlation-id'];
+          
+          console.log(`/exchange-code (POST) hit. Client ID: ${client_id}. Correlation ID: ${correlationIdFromHeader || 'N/A'}`);
+          
+          if (!code || !code_verifier) {
+            return res.status(400).json({ error: 'Missing required fields: code and code_verifier' });
+          }
+
+          try {
+            // Build the redirect URI for the specific client
+            const redirectUri = `${bffBaseUrl}/callback`;
+            
+            // Exchange the code for tokens using the BFF's OIDC client
+            const tokenSet = await oidcClient.callback(redirectUri, { code }, { code_verifier });
+            
+            // Store tokens in session (access token stays server-side)
+            req.session.tokenSet = tokenSet;
+            req.session.userInfo = tokenSet.claims();
+            req.session.clientId = client_id; // Track which client authenticated
+            
+            console.log(`Tokens received and stored in session for SPA. Client: ${client_id}. Session ID: ${req.sessionID}. Correlation ID: ${correlationIdFromHeader || 'N/A'}`);
+
+            req.session.save((err) => {
+              if (err) {
+                console.error(`Error saving session during POST exchange-code. Correlation ID: ${correlationIdFromHeader || 'N/A'}. Error: ${err.message}`);
+                return next(err);
+              }
+
+              // Return only the ID token to the SPA (access token remains server-side)
+              const response = {
+                id_token: tokenSet.id_token,
+                claims: tokenSet.claims(),
+                session_id: req.sessionID, // For tracking purposes
+              };
+              
+              console.log(`Session saved. Returning ID token to SPA. Session ID: ${req.sessionID}. Correlation ID: ${correlationIdFromHeader || 'N/A'}`);
+              res.json(response);
+            });
+          } catch (err) {
+            console.error(`Error in POST token exchange. Correlation ID: ${correlationIdFromHeader || 'N/A'}. Error: ${err.message}`, err.stack);
+            res.status(400).json({ 
+              error: 'Token exchange failed',
+              details: err.message 
+            });
           }
         });
 
@@ -418,6 +479,40 @@ async function startServer() {
           } else {
             res.status(401).json({ error: 'User not authenticated or session incomplete.' });
           }
+        });
+
+        // New endpoint for cross-site token validation using query parameter
+        // This is necessary because browsers block third-party cookies in cross-site scenarios
+        app.get('/api/verify-login', (req, res) => {
+          const sessionIdFromQuery = req.query.sessionId;
+          const correlationIdFromHeader = req.headers['x-correlation-id'];
+          
+          console.log(`/api/verify-login hit. Session ID from query: ${sessionIdFromQuery || 'N/A'}. Current Session ID: ${req.sessionID}. Correlation ID: ${correlationIdFromHeader || 'N/A'}`);
+          
+          // Check if current session has user info (when cookies are properly sent)
+          if (req.session.userInfo && req.session.tokenSet) {
+            console.log(`/api/verify-login: User authenticated via session cookie`);
+            return res.json({
+              authenticated: true,
+              message: "User is authenticated via session cookie.",
+              id_token: req.session.tokenSet.id_token,
+              access_token: req.session.tokenSet.access_token,
+              claims: req.session.userInfo
+            });
+          }
+          
+          // If sessionId is provided as query param, this is a cross-site scenario
+          // In production, you should validate this against your session store
+          if (sessionIdFromQuery) {
+            console.log(`/api/verify-login: Checking cross-site session validity for sessionId: ${sessionIdFromQuery}`);
+            // Return an error indicating that cross-site session validation requires additional setup
+            return res.status(401).json({ 
+              error: 'Session not found. Cross-site cookies are blocked by browser. Please ensure third-party cookies are enabled for this domain.',
+              hint: 'This is a known limitation of cross-site OIDC flows. Consider using a same-origin proxy or redirect-based pattern.'
+            });
+          }
+          
+          res.status(401).json({ error: 'User not authenticated.' });
         });
 
         app.get('/logout', async (req, res, next) => {

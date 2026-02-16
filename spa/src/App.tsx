@@ -22,28 +22,29 @@ async function generateCodeVerifierAndChallenge() {
 }
 
 async function exchangeCodeForToken(code: string, codeVerifier: string, clientId: string) {
-  const pingBaseUrl = import.meta.env.VITE_PING_BASE_URL;
-  const tokenEndpoint = pingBaseUrl.replace('authorization.oauth2', 'token.oauth2');
-  const redirectUri = `${window.location.origin}/callback`;
+  // Exchange code with BFF instead of directly with PingFederate
+  // This ensures the access token is kept server-side and only ID token is returned
+  const bffBaseUrl = import.meta.env.VITE_BFF_BASE_URL;
+  if (!bffBaseUrl) {
+    throw new Error('VITE_BFF_BASE_URL environment variable not configured');
+  }
 
-  const params = new URLSearchParams({
-    grant_type: 'authorization_code',
-    client_id: clientId,
-    code_verifier: codeVerifier,
-    code: code,
-    redirect_uri: redirectUri,
-  });
-
-  const response = await fetch(tokenEndpoint, {
+  const response = await fetch(`${bffBaseUrl}/exchange-code`, {
     method: 'POST',
+    credentials: 'include', // Include cookies for cross-site requests
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Type': 'application/json',
     },
-    body: params,
+    body: JSON.stringify({
+      code,
+      code_verifier: codeVerifier,
+      client_id: clientId,
+    }),
   });
 
   if (!response.ok) {
-    throw new Error('Failed to exchange code for token');
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Failed to exchange code for token: ${response.status}`);
   }
 
   return await response.json();
@@ -51,10 +52,8 @@ async function exchangeCodeForToken(code: string, codeVerifier: string, clientId
 
 function App() {
   const [authCode, setAuthCode] = useState<string | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [idToken, setIdToken] = useState<string | null>(null);
   const [decodedIdToken, setDecodedIdToken] = useState<any | null>(null);
-  const [decodedAccessToken, setDecodedAccessToken] = useState<any | null>(null);
   const [copied, setCopied] = useState<'code' | 'token' | 'idToken' | null>(null);
   const [isStaffLogin, setIsStaffLogin] = useState(false);
   const [isExchanging, setIsExchanging] = useState(false);
@@ -98,17 +97,7 @@ function App() {
         clientId
       );
 
-      setAccessToken(data.access_token);
-      
-      if (isStaffLogin) {
-        try {
-          const decodedAccess = jwtDecode(data.access_token);
-          setDecodedAccessToken(decodedAccess);
-        } catch (error) {
-          console.error('Failed to decode access token:', error);
-        }
-      }
-      
+      // SPA receives only the ID token (access token is kept server-side by BFF)
       if (data.id_token) {
         setIdToken(data.id_token);
         try {
@@ -117,7 +106,13 @@ function App() {
         } catch (error) {
           console.error('Failed to decode ID token:', error);
         }
+      } else {
+        throw new Error('No ID token returned from BFF');
       }
+
+      // Note: Access token is NOT available to the SPA
+      // It's kept server-side for security
+      console.log('Token exchange successful. ID token stored. Access token is kept server-side.');
     } catch (error) {
       setExchangeError(error instanceof Error ? error.message : 'Failed to exchange token');
     } finally {
@@ -157,10 +152,8 @@ function App() {
 
   const handleLogout = () => {
     setAuthCode(null);
-    setAccessToken(null);
     setIdToken(null);
     setDecodedIdToken(null);
-    setDecodedAccessToken(null);
     setExchangeError(null);
     sessionStorage.clear();
   };
@@ -202,11 +195,15 @@ function App() {
               </div>
             </div>
 
-            {!accessToken && (
+            {!idToken && (
               <div className="bg-gray-50 rounded-lg p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-3">
-                  Token Exchange
+                  Token Exchange with BFF
                 </h2>
+                <p className="text-sm text-gray-600 mb-4">
+                  Click below to exchange the authorization code for an ID token. 
+                  The access token will be kept server-side by the BFF for security.
+                </p>
                 <button
                   onClick={handleTokenExchange}
                   disabled={isExchanging}
@@ -217,47 +214,10 @@ function App() {
                   ) : (
                     <RefreshCw className="w-5 h-5" />
                   )}
-                  {isExchanging ? 'Exchanging...' : `Exchange for ${isStaffLogin ? 'Access' : 'Reference'} Token`}
+                  {isExchanging ? 'Exchanging...' : 'Exchange for ID Token'}
                 </button>
                 {exchangeError && (
                   <p className="mt-2 text-sm text-red-600">{exchangeError}</p>
-                )}
-              </div>
-            )}
-
-            {accessToken && (
-              <div className="bg-gray-50 rounded-lg p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-3">
-                  {isStaffLogin ? 'Access Token' : 'Reference Token'}
-                </h2>
-                <div className="bg-white border border-gray-200 rounded-lg p-3 flex items-center gap-2">
-                  <code className="text-sm text-gray-800 flex-1 break-all">
-                    {accessToken}
-                  </code>
-                  <button
-                    onClick={() => copyToClipboard('token', accessToken)}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    title="Copy to clipboard"
-                  >
-                    {copied === 'token' ? (
-                      <CheckCircle className="w-5 h-5 text-green-500" />
-                    ) : (
-                      <Copy className="w-5 h-5 text-gray-500" />
-                    )}
-                  </button>
-                </div>
-
-                {isStaffLogin && decodedAccessToken && (
-                  <div className="mt-4">
-                    <h3 className="text-md font-semibold text-gray-900 mb-2">
-                      Decoded Access Token
-                    </h3>
-                    <div className="bg-white border border-gray-200 rounded-lg p-3">
-                      <pre className="text-sm text-gray-800 whitespace-pre-wrap break-all">
-                        {JSON.stringify(decodedAccessToken, null, 2)}
-                      </pre>
-                    </div>
-                  </div>
                 )}
               </div>
             )}
