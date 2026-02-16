@@ -15,7 +15,6 @@ export default defineConfig(({ mode }) => {
     },
     envPrefix: 'VITE_',
     server: {
-      port: parseInt(env.VITE_SPA_PORT) || 5173,
       historyApiFallback: true,
     },
   };
