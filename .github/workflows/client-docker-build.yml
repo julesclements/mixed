@@ -35,8 +35,8 @@ jobs:
           file: ./client/Dockerfile # Path to the client's Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/ping-spa:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/ping-spa:${{ github.sha }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/ping-spa:${{ github.run_number }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/ping-client:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/ping-client:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/ping-client:${{ github.run_number }}
           # cache-from: type=gha
           # cache-to: type=gha,mode=max
