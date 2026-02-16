@@ -234,7 +234,8 @@ async function startServer() {
             httpOnly: true,
             maxAge: 24 * 60 * 60 * 1000,
             sameSite: useSecureCookies ? 'None' : 'Lax',
-            partitioned: useSecureCookies
+            // Optionally set domain: '.hdc.company' if you want to share cookies across subdomains
+            // domain: '.hdc.company'
           }
         }));
 
