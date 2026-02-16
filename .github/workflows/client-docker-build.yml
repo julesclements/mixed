@@ -34,10 +34,9 @@ jobs:
           context: ./client # Context is the client directory
           file: ./client/Dockerfile # Path to the client's Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/ping-client:latest # Example image name, user can customize
-          # To add more tags, like git sha:
-          # tags: |
-          #   ${{ secrets.DOCKERHUB_USERNAME }}/ping-client:latest
-          #   ${{ secrets.DOCKERHUB_USERNAME }}/ping-client:${{ github.sha }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/ping-spa:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/ping-spa:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/ping-spa:${{ github.run_number }}
           # cache-from: type=gha
           # cache-to: type=gha,mode=max
