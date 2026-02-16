@@ -41,6 +41,14 @@ This project uses environment variables for configuration. You should create `.e
 | `ALLOW_SELF_SIGNED_CERTS` | Set to `true` to bypass certificate validation (development only). |
 | `NODE_ENV` | Set to `production` to enable secure cookie attributes. |
 
+### Javascript Client (`/client/.env`)
+
+| Variable | Description |
+| :--- | :--- |
+| `VITE_STAFF_CLIENT_ID` | OIDC Client ID for staff login. |
+| `VITE_CUSTOMER_CLIENT_ID` | OIDC Client ID for customer login. |
+| `VITE_PING_BASE_URL` | The authorization endpoint for PingFederate. |
+
 ### Single Page Application (`/spa/.env`)
 
 | Variable | Description |
