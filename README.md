@@ -385,7 +385,6 @@ The BFF exposes the following API endpoints that the client interacts with (afte
     *   **Response:** Returns the JSON response directly from PingFederate's introspection endpoint. This typically includes an `active: true/false` field and other metadata about the token if it's valid and active.
     *   Returns appropriate error responses (400, 401, 500) if the request is invalid, the user is not authenticated with the BFF, or introspection fails.
 
-### Client Application Features
 *   **Login/Logout:** Initiates OIDC authentication flow via the BFF. This involves:
     1. Redirect to BFF's `/login` (shows confirmation page).
     2. User confirms, browser hits BFF's `/initiate-ping-login` (redirects to PingFederate).
@@ -416,3 +415,40 @@ The BFF exposes the following API endpoints that the client interacts with (afte
         *   **Authorization Redirect (Browser to PingFederate):** When the BFF redirects the user's browser to PingFederate's authorization endpoint (e.g., `/as/authorization.oauth2`), the `X-Correlation-ID` (even if passed to the BFF's `/login` or `/initiate-ping-login` routes) cannot be injected by the BFF as an HTTP header into this redirect, as it's a standard browser navigation initiated by the user agent. The ID is logged by the BFF during these initiation steps.
     *   This forwarding of the `X-Correlation-ID` in backchannel requests (where possible) can be very useful if PingFederate's audit logs or its detailed request logging is configured to capture and display custom HTTP headers, aiding in end-to-end tracing of a specific user interaction.
 *   **Security Note on Client-Side Token Decoding:** The client-side decoding of JWTs (ID Token, Access Token) is **for display and informational purposes only**. The client **must not** use any information decoded from these tokens to make security decisions or to grant access to resources. All token validation (signatures, expiry, claims) and authorization decisions are the responsibility of the Backend-for-Frontend (BFF).
+
+### /client Authentication Flow (Mermaid Diagram)
+
+```mermaid
+sequenceDiagram
+     actor User
+     participant Browser as Client (Browser)
+     participant BFF as BFF (Node.js/Express)
+     participant PingFed as PingFederate
+
+     User->>Browser: Clicks Login
+     Browser->>BFF: GET /login?correlationId
+     BFF->>Browser: Confirmation page
+     User->>Browser: Clicks Proceed
+     Browser->>BFF: GET /initiate-ping-login
+     BFF->>PingFed: Redirect to PingFederate
+     User->>PingFed: Authenticate
+     PingFed->>BFF: Redirect with code
+     BFF->>Browser: Auth code page
+     User->>Browser: Clicks Exchange Code
+     Browser->>BFF: GET /exchange-code
+     BFF->>PingFed: Token exchange
+     PingFed->>BFF: Returns tokens
+     BFF->>Browser: Redirect to /client
+     Browser->>BFF: GET /api/user (with session cookie, X-Correlation-ID)
+     BFF->>Browser: Returns user info, tokens
+     Browser->>User: Shows decoded tokens
+     User->>Browser: Clicks Introspect (if access token is opaque)
+     Browser->>BFF: POST /api/introspect-token (with access token, X-Correlation-ID)
+     BFF->>PingFed: Introspect token
+     PingFed->>BFF: Returns introspection result
+     BFF->>Browser: Returns introspection result
+     User->>Browser: Clicks Logout
+     Browser->>BFF: GET /logout?correlationId
+     BFF->>PingFed: End session
+     PingFed->>Browser: Redirect to /client
+```
