@@ -335,13 +335,6 @@ function App() {
             <LogIn className="w-5 h-5" />
             Staff Sign-in
           </button>
-          <button
-            onClick={() => handleLogin(import.meta.env.VITE_CUSTOMER_CLIENT_ID, 'customer')}
-            className="w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
-          >
-            <LogIn className="w-5 h-5" />
-            Customer Sign-in
-          </button>
         </div>
       </div>
     </div>
