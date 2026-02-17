@@ -21,19 +21,21 @@ It uses `express-session` for session management and `openid-client` for OIDC in
     *   `PING_ISSUER_URL`: The issuer URI of your PingFederate server (e.g., `https://ping.hdc.company` or `https://localhost:9031`). The library will use this to discover OIDC endpoints.
     *   `SESSION_SECRET`: A long, random, and secure string used to sign the session ID cookie. Generate a strong one.
     *   `BFF_PORT`: The port on which the BFF server will listen (default is `3001`).
-    *   `FRONTEND_ORIGIN`: **Crucial for CORS configuration.** This **MUST be the exact *origin*** of your client application, used for the BFF's `Access-Control-Allow-Origin` header.
+    *   `FRONTEND_ORIGIN`: **Crucial for CORS configuration.** This **MUST be the exact *origin*** (or a comma-separated list of origins) of your client application(s), used for the BFF's `Access-Control-Allow-Origin` header.
         *   An origin is defined by its scheme (e.g., `http` or `https`), hostname (e.g., `localhost`, `julesclements.github.io`), and port (if it's not the default for the scheme, e.g., `:1234`).
         *   **DO NOT include paths or trailing slashes.**
         *   **Correct Examples:**
             *   For local client development (e.g., Parcel dev server on port 1234): `http://localhost:1234`
             *   For the production client on GitHub Pages: `https://julesclements.github.io`
+            *   For multiple origins: `http://localhost:1234,http://localhost:5173,https://julesclements.github.io`
         *   **Incorrect Examples:** `http://localhost:1234/`, `https://julesclements.github.io/mixed/`
-        *   **Why it's important for CORS:** The browser's `Origin` header (e.g., `https://julesclements.github.io`) sent with cross-origin requests from the client must exactly match this `FRONTEND_ORIGIN` value for the browser to accept responses from the BFF.
-    *   `FRONTEND_REDIRECT_URL`: The **full URL** (including any necessary path like `/mixed/`) where the BFF should redirect the user's browser after operations like login or logout.
+        *   **Why it's important for CORS:** The browser's `Origin` header sent with cross-origin requests must match one of the origins in `FRONTEND_ORIGIN` for the browser to accept responses from the BFF.
+    *   `FRONTEND_REDIRECT_URL`: The **full URL** (or a comma-separated list of URLs) where the BFF should redirect the user's browser after operations like login or logout.
         *   **Correct Examples:**
-            *   For local client development (if client is served at the root of its port): `http://localhost:1234/`
-            *   For the production client on GitHub Pages (if the site is `julesclements.github.io/mixed/`): `https://julesclements.github.io/mixed/`
-        *   This URL is used in OIDC `post_logout_redirect_uri` and for redirecting after the token exchange.
+            *   For local client development: `http://localhost:1234/`
+            *   For the production client on GitHub Pages: `https://julesclements.github.io/mixed/`
+            *   For multiple redirects: `http://localhost:1234/,http://localhost:5173/,https://julesclements.github.io/mixed/`
+        *   This URL is used in OIDC `post_logout_redirect_uri` and for redirecting after the token exchange. The BFF will attempt to use a `returnTo` query parameter provided during `/login` or `/logout` (if it matches one of the allowed URLs) or fallback to the first URL in this list.
     *   `BFF_BASE_URL`: The base URL where the BFF itself is running. This is crucial for constructing the `redirect_uri` that PingFederate will use.
         *   For local development: `http://localhost:3001` (or whatever `BFF_PORT` is).
         *   For production: `https://mixed.hdc.company` (this is the public URL of your deployed BFF).

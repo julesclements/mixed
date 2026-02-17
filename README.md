@@ -36,8 +36,8 @@ This project uses environment variables for configuration. You should create `.e
 | `SESSION_SECRET` | A long, random, and secure string used to sign the session ID cookie. |
 | `BFF_PORT` | The port on which the BFF server will listen (default is `3001`). |
 | `BFF_BASE_URL` | The base URL where the BFF itself is running (e.g., `http://localhost:3001`). |
-| `FRONTEND_ORIGIN` | The exact origin of your client application (e.g., `http://localhost:1234`). |
-| `FRONTEND_REDIRECT_URL` | The full URL where the BFF should redirect after login/logout. |
+| `FRONTEND_ORIGIN` | The exact origin of your client application (e.g., `http://localhost:1234`). Supports comma-separated lists for multiple origins. |
+| `FRONTEND_REDIRECT_URL` | The full URL where the BFF should redirect after login/logout. Supports comma-separated lists for multiple origins. |
 | `ALLOW_SELF_SIGNED_CERTS` | Set to `true` to bypass certificate validation (development only). |
 | `NODE_ENV` | Set to `production` to enable secure cookie attributes. |
 
