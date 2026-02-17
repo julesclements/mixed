@@ -118,34 +118,37 @@ const fetchUser = async (isSilent = false, expectedLogin = false) => {
 
         if (response.ok) {
             const data = await response.json();
-            const decodedIdToken = decodeJwtPayload(data.id_token);
-            const decodedAccessToken = decodeJwtPayload(data.access_token);
 
-            let userInfoHtml = `<h3>${escapeHtml(data.message) || 'User Information'}</h3>`;
-            userInfoHtml += '<h4>ID Token Claims (from BFF session):</h4>';
-            userInfoHtml += `<pre>${JSON.stringify(data.claims, null, 2)}</pre>`;
-            userInfoHtml += '<h4>Decoded ID Token Payload (client-side decode):</h4>';
-            userInfoHtml += `<pre>${JSON.stringify(decodedIdToken, null, 2)}</pre>`;
-            if (decodedAccessToken) {
-              userInfoHtml += '<h4>Decoded Access Token Payload (client-side decode):</h4>';
-              userInfoHtml += `<pre>${JSON.stringify(decodedAccessToken, null, 2)}</pre>`;
-            } else {
-              userInfoHtml += '<h4>Access Token (Opaque or unparseable by client):</h4>';
-              userInfoHtml += `<pre style="word-wrap: break-word; white-space: pre-wrap;">${escapeHtml(data.access_token)}</pre>`;
-            }
-            userInfoHtml += '<h4>Raw ID Token:</h4>';
-            userInfoHtml += `<pre style="word-wrap: break-word; white-space: pre-wrap;">${escapeHtml(data.id_token)}</pre>`;
-            userInfoHtml += '<h4>Raw Access Token:</h4>';
-            userInfoHtml += `<pre style="word-wrap: break-word; white-space: pre-wrap;">${escapeHtml(data.access_token)}</pre>`;
-            userInfoDiv.innerHTML = userInfoHtml;
+            if (!isSilent) {
+                const decodedIdToken = decodeJwtPayload(data.id_token);
+                const decodedAccessToken = decodeJwtPayload(data.access_token);
 
-            introspectionSection.innerHTML = '';
-            if (!decodedAccessToken && data.access_token) {
-                const introspectButton = document.createElement('button');
-                introspectButton.id = 'introspectTokenButton';
-                introspectButton.textContent = 'Introspect Access Token';
-                introspectButton.addEventListener('click', () => handleIntrospectionClick(data.access_token));
-                introspectionSection.appendChild(introspectButton);
+                let userInfoHtml = `<h3>${escapeHtml(data.message) || 'User Information'}</h3>`;
+                userInfoHtml += '<h4>ID Token Claims (from BFF session):</h4>';
+                userInfoHtml += `<pre>${JSON.stringify(data.claims, null, 2)}</pre>`;
+                userInfoHtml += '<h4>Decoded ID Token Payload (client-side decode):</h4>';
+                userInfoHtml += `<pre>${JSON.stringify(decodedIdToken, null, 2)}</pre>`;
+                if (decodedAccessToken) {
+                  userInfoHtml += '<h4>Decoded Access Token Payload (client-side decode):</h4>';
+                  userInfoHtml += `<pre>${JSON.stringify(decodedAccessToken, null, 2)}</pre>`;
+                } else {
+                  userInfoHtml += '<h4>Access Token (Opaque or unparseable by client):</h4>';
+                  userInfoHtml += `<pre style="word-wrap: break-word; white-space: pre-wrap;">${escapeHtml(data.access_token)}</pre>`;
+                }
+                userInfoHtml += '<h4>Raw ID Token:</h4>';
+                userInfoHtml += `<pre style="word-wrap: break-word; white-space: pre-wrap;">${escapeHtml(data.id_token)}</pre>`;
+                userInfoHtml += '<h4>Raw Access Token:</h4>';
+                userInfoHtml += `<pre style="word-wrap: break-word; white-space: pre-wrap;">${escapeHtml(data.access_token)}</pre>`;
+                userInfoDiv.innerHTML = userInfoHtml;
+
+                introspectionSection.innerHTML = '';
+                if (!decodedAccessToken && data.access_token) {
+                    const introspectButton = document.createElement('button');
+                    introspectButton.id = 'introspectTokenButton';
+                    introspectButton.textContent = 'Introspect Access Token';
+                    introspectButton.addEventListener('click', () => handleIntrospectionClick(data.access_token));
+                    introspectionSection.appendChild(introspectButton);
+                }
             }
 
             errorMessageDiv.textContent = '';
