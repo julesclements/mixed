@@ -25,6 +25,32 @@ const allowedOrigins = process.env.FRONTEND_ORIGIN ? process.env.FRONTEND_ORIGIN
 const allowedRedirectUrls = process.env.FRONTEND_REDIRECT_URL ? process.env.FRONTEND_REDIRECT_URL.split(',').map(u => u.trim()) : [];
 const allowSelfSignedCerts = process.env.ALLOW_SELF_SIGNED_CERTS === 'true';
 
+/**
+ * Helper to determine the best redirect URL based on the request's Referer header.
+ * Matches the Referer origin against allowedOrigins to find the corresponding allowedRedirectUrls entry.
+ */
+function getMatchingRedirectUrl(req) {
+  const referer = req.headers.referer;
+  if (referer) {
+    try {
+      const refererUrl = new URL(referer);
+      const refererOrigin = refererUrl.origin;
+      const index = allowedOrigins.indexOf(refererOrigin);
+      if (index !== -1 && allowedRedirectUrls[index]) {
+        return allowedRedirectUrls[index];
+      }
+      // Fallback: search for any allowed redirect URL that is a prefix of the referer
+      const matchingUrl = allowedRedirectUrls.find(url => referer.startsWith(url));
+      if (matchingUrl) {
+        return matchingUrl;
+      }
+    } catch (e) {
+      // Ignore invalid URL
+    }
+  }
+  return allowedRedirectUrls[0];
+}
+
 // --- Helper Functions ---
 function escapeHtml(unsafe) {
   if (typeof unsafe !== 'string') return '';
@@ -261,7 +287,7 @@ async function startServer() {
 
         app.get('/login', (req, res) => {
           const correlationId = req.query.correlationId;
-          const returnTo = req.query.returnTo;
+          const returnTo = req.query.returnTo || getMatchingRedirectUrl(req);
           console.log(`/login route hit. Correlation ID from query: ${correlationId || 'N/A'}, returnTo: ${returnTo || 'N/A'}`);
           const confirmationPageHtml = `
             <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -280,7 +306,7 @@ async function startServer() {
         app.get('/initiate-ping-login', (req, res, next) => {
           if (!oidcClient) return next(new Error('OIDC client not initialized.'));
           const correlationId = req.query.correlationId;
-          const returnTo = req.query.returnTo;
+          const returnTo = req.query.returnTo || getMatchingRedirectUrl(req);
           console.log(`Initiating OIDC login. Correlation ID from query: ${correlationId || 'N/A'}, returnTo: ${returnTo || 'N/A'}`);
 
           if (returnTo) {
@@ -380,7 +406,7 @@ async function startServer() {
               // Log session cookie details for debugging cross-site issues
               console.log(`Session saved successfully. Setting session cookie with secure=${useSecureCookies}, sameSite=${'None'}`);
               
-              const frontendUrl = req.session.returnTo || allowedRedirectUrls[0];
+              const frontendUrl = req.session.returnTo || getMatchingRedirectUrl(req);
               const redirectUrl = new URL(frontendUrl);
               redirectUrl.searchParams.set('login_status', 'success');
               if (correlationId) {
@@ -394,7 +420,7 @@ async function startServer() {
           } catch (err) {
             console.error(`Error in OIDC token exchange. Correlation ID: ${correlationId || 'N/A'}. Error: ${err.message}`, err.stack);
 
-            const frontendUrl = req.session.returnTo || allowedRedirectUrls[0];
+            const frontendUrl = req.session.returnTo || getMatchingRedirectUrl(req);
             const redirectUrl = new URL(frontendUrl);
             redirectUrl.searchParams.set('exchange_error', err.message);
             if (correlationId) {
@@ -540,11 +566,12 @@ async function startServer() {
 
         app.get('/logout', async (req, res, next) => {
           const correlationId = req.session.correlationId || req.query.correlationId;
-          const returnTo = req.query.returnTo || req.session.returnTo || allowedRedirectUrls[0];
+          const defaultRedirect = getMatchingRedirectUrl(req);
+          const returnTo = req.query.returnTo || req.session.returnTo || defaultRedirect;
           console.log(`/logout hit. Correlation ID: ${correlationId || 'N/A'}, returnTo: ${returnTo}`);
 
           // Validate returnTo if it came from query
-          const finalReturnTo = allowedRedirectUrls.includes(returnTo) ? returnTo : allowedRedirectUrls[0];
+          const finalReturnTo = allowedRedirectUrls.includes(returnTo) ? returnTo : defaultRedirect;
 
           if (!oidcClient) return next(new Error('OIDC client not initialized.'));
           const idToken = req.session.tokenSet ? req.session.tokenSet.id_token : undefined;
