@@ -76,6 +76,8 @@ function App() {
       unsupported_response_type: 'The response type is not supported. Ensure "code" response type is configured.',
       invalid_scope: 'One or more requested scopes are invalid. Check that "openid" scope is available.',
       temporarily_unavailable: 'The authorization server is temporarily unavailable. Please try again later.',
+      interaction_required: 'The authorization server requires user interaction. Please sign in again.',
+      consent_required: 'The authorization server requires user consent. Please sign in again.',
     };
     return guidance[errorCode] || `An OAuth error occurred: ${errorCode}. Contact your administrator for assistance.`;
   };
@@ -178,7 +180,7 @@ function App() {
 
           setCodeRefreshMessage({
             type: 'success',
-            message: 'New Authorization code refreshed'
+            message: 'Authorization code expired or used. Redirecting to PingFederate for a new one...'
           });
 
           setTimeout(() => {
@@ -339,10 +341,6 @@ function App() {
             <button
               onClick={() => {
                 setShowBackMenu(false);
-                setAccessToken(null);
-                setIdToken(null);
-                setDecodedAccessToken(null);
-                setDecodedIdToken(null);
                 setExchangeError(null);
               }}
               className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 font-medium"
