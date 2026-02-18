@@ -315,7 +315,7 @@ function App() {
           Welcome to Secure Auth
         </h1>
         <p className="text-gray-600 mb-8">
-          Please select your sign-in method below.
+          SPA PKCE Demonstration
         </p>
         <div className="flex flex-col gap-4">
           <button

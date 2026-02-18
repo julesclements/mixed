@@ -26,8 +26,18 @@ body {
 }
 
 h1 {
-    color: #333;
-    margin-bottom: 25px; /* Add some space below heading */
+    color: #111827; /* Tailwind gray-900 */
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 8px; /* Tailwind mb-2 */
+    margin-top: 0;
+}
+
+.subtext {
+    color: #4b5563; /* Tailwind gray-600 */
+    font-size: 16px;
+    margin-bottom: 32px; /* Tailwind mb-8 */
+    margin-top: 0;
 }
 
 /* Styling for the div containing buttons */
