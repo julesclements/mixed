@@ -1,8 +1,8 @@
 # Stage 1: Build the static assets for the SPA
 FROM node:20-slim AS builder
 
-ARG VITE_STAFF_CLIENT_ID=your_staff_id_here
-ARG VITE_PING_BASE_URL=https://localhost:9031
+ARG VITE_STAFF_CLIENT_ID
+ARG VITE_PING_BASE_URL
 
 WORKDIR /app/spa
 

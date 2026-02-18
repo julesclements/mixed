@@ -54,7 +54,6 @@ This project uses environment variables for configuration. You should create `.e
 | :--- | :--- |
 | `VITE_STAFF_CLIENT_ID` | OIDC Client ID for staff login. |
 | `VITE_PING_BASE_URL` | The authorization endpoint for PingFederate. |
-| `VITE_BFF_BASE_URL` | The base URL of the BFF server. |
 | `VITE_SPA_PORT` | The port on which the SPA development server will listen (default is `5173`). |
 
 ## Deployment
@@ -214,11 +213,6 @@ The SPA can be deployed as a Docker container using the provided `spa/Dockerfile
     *   The image is tagged as `yourdockerhubusername/ping-spa:latest` (or similar, based on the workflow and secrets).
     *   **Required GitHub Secrets:** For this workflow to push to Docker Hub, you must configure `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` in your GitHub repository secrets.
 
-3.  **SPA Configuration (e.g., BFF URL):**
-    *   Similar to the `/client` application, the SPA will need to know the URL of the BFF (`bffBaseUrl`).
-    *   If the SPA is a static build, this URL might be configured at build time (e.g., via environment variables passed to the build process) or the SPA's JavaScript might dynamically determine it based on `window.location.hostname` (similar to `client/script.js`).
-    *   When running the SPA Docker container locally (e.g., on `http://localhost:1234`), it would typically try to connect to the BFF at `http://localhost:3001` if the BFF is also running locally and the SPA uses similar dynamic logic as the `/client` app.
-    *   For deployed scenarios, ensure the SPA is configured to point to the production BFF URL (e.g., `https://mixed.hdc.company`).
 
 ### BFF API Endpoints
 
