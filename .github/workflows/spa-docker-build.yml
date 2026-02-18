@@ -40,7 +40,6 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/ping-spa:${{ github.run_number }}
           build-args: |
             VITE_STAFF_CLIENT_ID=${{ vars.VITE_STAFF_CLIENT_ID }}
-            VITE_CUSTOMER_CLIENT_ID=${{ vars.VITE_CUSTOMER_CLIENT_ID }}
             VITE_PING_BASE_URL=${{ vars.VITE_PING_BASE_URL }}
           # cache-from: type=gha
           # cache-to: type=gha,mode=max

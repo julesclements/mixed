@@ -56,7 +56,6 @@ function App() {
   const [decodedIdToken, setDecodedIdToken] = useState<any | null>(null);
   const [decodedAccessToken, setDecodedAccessToken] = useState<any | null>(null);
   const [copied, setCopied] = useState<'code' | 'token' | 'idToken' | null>(null);
-  const [isStaffLogin, setIsStaffLogin] = useState(false);
   const [isExchanging, setIsExchanging] = useState(false);
   const [exchangeError, setExchangeError] = useState<string | null>(null);
 
@@ -67,10 +66,6 @@ function App() {
     
     if (code) {
       setAuthCode(code);
-      const storedState = sessionStorage.getItem('auth_state');
-      const storedClientType = sessionStorage.getItem('client_type');
-      
-      setIsStaffLogin(storedClientType === 'staff');
       
       if (window.location.pathname === '/callback') {
         window.history.replaceState({}, document.title, '/');
@@ -88,9 +83,7 @@ function App() {
         throw new Error('Missing required authentication data');
       }
       
-      const clientId = isStaffLogin 
-        ? import.meta.env.VITE_STAFF_CLIENT_ID 
-        : import.meta.env.VITE_CUSTOMER_CLIENT_ID;
+      const clientId = import.meta.env.VITE_STAFF_CLIENT_ID;
 
       const data = await exchangeCodeForToken(
         authCode,
@@ -100,13 +93,11 @@ function App() {
 
       setAccessToken(data.access_token);
       
-      if (isStaffLogin) {
-        try {
-          const decodedAccess = jwtDecode(data.access_token);
-          setDecodedAccessToken(decodedAccess);
-        } catch (error) {
-          console.error('Failed to decode access token:', error);
-        }
+      try {
+        const decodedAccess = jwtDecode(data.access_token);
+        setDecodedAccessToken(decodedAccess);
+      } catch (error) {
+        console.error('Failed to decode access token:', error);
       }
       
       if (data.id_token) {
@@ -125,7 +116,7 @@ function App() {
     }
   };
 
-  const handleLogin = async (clientId: string, clientType: 'staff' | 'customer') => {
+  const handleLogin = async (clientId: string) => {
     const pingBaseUrl = import.meta.env.VITE_PING_BASE_URL;
     const redirectUri = `${window.location.origin}/callback`;
     
@@ -134,7 +125,6 @@ function App() {
 
     sessionStorage.setItem('pkce_code_verifier', codeVerifier);
     sessionStorage.setItem('auth_state', state);
-    sessionStorage.setItem('client_type', clientType);
 
     const authUrl = `${pingBaseUrl}?` +
       `client_id=${clientId}` +
@@ -217,7 +207,7 @@ function App() {
                   ) : (
                     <RefreshCw className="w-5 h-5" />
                   )}
-                  {isExchanging ? 'Exchanging...' : `Exchange for ${isStaffLogin ? 'Access' : 'Reference'} Token`}
+                  {isExchanging ? 'Exchanging...' : 'Exchange for Access Token'}
                 </button>
                 {exchangeError && (
                   <p className="mt-2 text-sm text-red-600">{exchangeError}</p>
@@ -228,7 +218,7 @@ function App() {
             {accessToken && (
               <div className="bg-gray-50 rounded-lg p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-3">
-                  {isStaffLogin ? 'Access Token' : 'Reference Token'}
+                  Access Token
                 </h2>
                 <div className="bg-white border border-gray-200 rounded-lg p-3 flex items-center gap-2">
                   <code className="text-sm text-gray-800 flex-1 break-all">
@@ -247,7 +237,7 @@ function App() {
                   </button>
                 </div>
 
-                {isStaffLogin && decodedAccessToken && (
+                {decodedAccessToken && (
                   <div className="mt-4">
                     <h3 className="text-md font-semibold text-gray-900 mb-2">
                       Decoded Access Token
@@ -325,11 +315,11 @@ function App() {
           Welcome to Secure Auth
         </h1>
         <p className="text-gray-600 mb-8">
-          Please select your sign-in method below.
+          SPA PKCE Demonstration
         </p>
         <div className="flex flex-col gap-4">
           <button
-            onClick={() => handleLogin(import.meta.env.VITE_STAFF_CLIENT_ID, 'staff')}
+            onClick={() => handleLogin(import.meta.env.VITE_STAFF_CLIENT_ID)}
             className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
           >
             <LogIn className="w-5 h-5" />
