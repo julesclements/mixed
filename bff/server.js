@@ -285,6 +285,8 @@ async function startServer() {
         // --- Express Routes ---
         const requestedScopes = ['openid', 'profile', 'email'];
 
+        app.get('/', (req, res) => res.json({ status: 'up' }));
+
         app.get('/login', (req, res) => {
           const correlationId = req.query.correlationId;
           const returnTo = req.query.returnTo || getMatchingRedirectUrl(req);

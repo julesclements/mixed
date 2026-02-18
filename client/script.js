@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (userInfoDiv) userInfoDiv.innerHTML = '';
     if (errorMessageDiv) errorMessageDiv.textContent = '';
     if (introspectionSection) introspectionSection.innerHTML = '';
-    if (loginButton) loginButton.style.display = 'block';
+    if (loginButton) loginButton.style.display = 'flex';
     if (fetchUserButton) fetchUserButton.style.display = 'none';
     if (logoutButton) logoutButton.style.display = 'none';
 
@@ -153,8 +153,8 @@ const fetchUser = async (isSilent = false, expectedLogin = false) => {
 
             errorMessageDiv.textContent = '';
             loginButton.style.display = 'none';
-            fetchUserButton.style.display = 'block'; // Keep fetch button visible to allow refreshing
-            logoutButton.style.display = 'block';
+            fetchUserButton.style.display = 'flex'; // Keep fetch button visible to allow refreshing
+            logoutButton.style.display = 'flex';
         } else if (response.status === 401) {
             userInfoDiv.innerHTML = '';
             introspectionSection.innerHTML = '';
@@ -186,7 +186,7 @@ const fetchUser = async (isSilent = false, expectedLogin = false) => {
             } else if (!isSilent) {
                 errorMessageDiv.textContent = 'Please login to view user information.';
             }
-            loginButton.style.display = 'block';
+            loginButton.style.display = 'flex';
             fetchUserButton.style.display = 'none';
             logoutButton.style.display = 'none';
         } else {
@@ -196,7 +196,7 @@ const fetchUser = async (isSilent = false, expectedLogin = false) => {
             if (!isSilent) {
                 errorMessageDiv.textContent = `Error fetching user: ${response.status} ${errorText || response.statusText}`;
             }
-            loginButton.style.display = 'block';
+            loginButton.style.display = 'flex';
             fetchUserButton.style.display = 'none';
             logoutButton.style.display = 'none';
         }
@@ -207,7 +207,7 @@ const fetchUser = async (isSilent = false, expectedLogin = false) => {
         if (!isSilent) {
             errorMessageDiv.textContent = 'Network error or server is unavailable. Please try again later.';
         }
-        loginButton.style.display = 'block';
+        loginButton.style.display = 'flex';
         fetchUserButton.style.display = 'none';
         logoutButton.style.display = 'none';
     }
