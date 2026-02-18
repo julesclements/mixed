@@ -342,6 +342,10 @@ function App() {
               onClick={() => {
                 setShowBackMenu(false);
                 setExchangeError(null);
+                setAccessToken(null);
+                setIdToken(null);
+                setDecodedAccessToken(null);
+                setDecodedIdToken(null);
               }}
               className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 font-medium"
             >
