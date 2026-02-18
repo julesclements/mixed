@@ -68,8 +68,22 @@ button:hover {
     background-color: #15803d; /* Tailwind green-700 */
 }
 
-/* Specific IDs if ever needed, but general button styling should cover them */
-/* #loginButton, #fetchUserButton, #logoutButton {} */
+/* Specific styles to override the general button background color */
+#logoutButton {
+    background-color: #dc2626; /* Tailwind red-600 */
+}
+
+#logoutButton:hover {
+    background-color: #b91c1c; /* Tailwind red-700 */
+}
+
+#fetchUserButton {
+    background-color: #2563eb; /* Tailwind blue-600 */
+}
+
+#fetchUserButton:hover {
+    background-color: #1d4ed8; /* Tailwind blue-700 */
+}
 
 #userInfo {
     color: #555;
