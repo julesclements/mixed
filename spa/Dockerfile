@@ -1,9 +1,6 @@
 # Stage 1: Build the static assets for the SPA
 FROM node:20-slim AS builder
 
-ARG VITE_STAFF_CLIENT_ID
-ARG VITE_PING_BASE_URL
-
 WORKDIR /app/spa
 
 # Copy package.json and package-lock.json (if available)
@@ -17,8 +14,6 @@ COPY . .
 
 # Build the application
 # The output will be in the /app/spa/dist directory
-ENV VITE_STAFF_CLIENT_ID=${VITE_STAFF_CLIENT_ID}
-ENV VITE_PING_BASE_URL=${VITE_PING_BASE_URL}
 RUN npm run build
 
 # Stage 2: Serve the static assets from the 'dist' directory
