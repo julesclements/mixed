@@ -65,6 +65,7 @@ function App() {
   const [exchangeError, setExchangeError] = useState<string | null>(null);
   const [oauthError, setOAuthError] = useState<{ error: string; description?: string; clientId?: string; redirectUri?: string } | null>(null);
   const [showBackMenu, setShowBackMenu] = useState(false);
+  const [codeRefreshMessage, setCodeRefreshMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const getErrorGuidance = (errorCode: string): string => {
     const guidance: Record<string, string> = {
@@ -108,13 +109,14 @@ function App() {
   const handleTokenExchange = async () => {
     setIsExchanging(true);
     setExchangeError(null);
-    
+    setCodeRefreshMessage(null);
+
     try {
       const storedCodeVerifier = sessionStorage.getItem('pkce_code_verifier');
       if (!authCode || !storedCodeVerifier) {
         throw new Error('Missing required authentication data');
       }
-      
+
       const clientId = import.meta.env.VITE_STAFF_CLIENT_ID;
 
       const data = await exchangeCodeForToken(
@@ -124,14 +126,14 @@ function App() {
       );
 
       setAccessToken(data.access_token);
-      
+
       try {
         const decodedAccess = jwtDecode(data.access_token);
         setDecodedAccessToken(decodedAccess);
       } catch (error) {
         console.error('Failed to decode access token:', error);
       }
-      
+
       if (data.id_token) {
         setIdToken(data.id_token);
         try {
@@ -142,9 +144,58 @@ function App() {
         }
       }
     } catch (error) {
-      setExchangeError(error instanceof Error ? error.message : 'Failed to exchange token');
+      const errorMsg = error instanceof Error ? error.message : 'Failed to exchange token';
+      setExchangeError(errorMsg);
+
+      if (errorMsg.includes('Failed to exchange code for token')) {
+        setIsExchanging(true);
+        setCodeRefreshMessage(null);
+
+        try {
+          const clientId = import.meta.env.VITE_STAFF_CLIENT_ID;
+          const pingBaseUrl = import.meta.env.VITE_PING_BASE_URL;
+          const authEndpoint = pingBaseUrl.includes('/as/authorization.oauth2')
+            ? pingBaseUrl
+            : `${pingBaseUrl.replace(/\/$/, '')}/as/authorization.oauth2`;
+
+          const redirectUri = `${window.location.origin}/callback`;
+          const { codeVerifier, codeChallenge } = await generateCodeVerifierAndChallenge();
+          const state = window.crypto.randomUUID();
+
+          sessionStorage.setItem('pkce_code_verifier', codeVerifier);
+          sessionStorage.setItem('auth_state', state);
+          sessionStorage.setItem('auth_client_id', clientId);
+
+          const authUrl = `${authEndpoint}?` +
+            `client_id=${clientId}` +
+            `&response_type=code` +
+            `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+            `&scope=openid` +
+            `&response_mode=query` +
+            `&code_challenge=${codeChallenge}` +
+            `&code_challenge_method=S256` +
+            `&state=${state}`;
+
+          setCodeRefreshMessage({
+            type: 'success',
+            message: 'New Authorization code refreshed'
+          });
+
+          setTimeout(() => {
+            window.location.href = authUrl;
+          }, 2000);
+        } catch (refreshError) {
+          setCodeRefreshMessage({
+            type: 'error',
+            message: 'Failed to refresh authorization code'
+          });
+          setIsExchanging(false);
+        }
+      }
     } finally {
-      setIsExchanging(false);
+      if (!codeRefreshMessage) {
+        setIsExchanging(false);
+      }
     }
   };
 
@@ -333,6 +384,18 @@ function App() {
                   )}
                 </button>
               </div>
+              {codeRefreshMessage && (
+                <div className={`mt-3 p-3 rounded-lg text-sm font-medium flex items-center gap-2 ${
+                  codeRefreshMessage.type === 'success'
+                    ? 'bg-green-50 text-green-700'
+                    : 'bg-red-50 text-red-700'
+                }`}>
+                  {codeRefreshMessage.type === 'success' && (
+                    <CheckCircle className="w-4 h-4" />
+                  )}
+                  {codeRefreshMessage.message}
+                </div>
+              )}
             </div>
 
             {!accessToken && (
