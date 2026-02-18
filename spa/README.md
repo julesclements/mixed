@@ -25,10 +25,10 @@ A minimal Node.js application that demonstrates authentication with PingFederate
    ```
    npm install
    ```
-3. Create a `.env` file based on `.env.example` and update with your PingFederate credentials:
+3. Create a `.env` file (e.g., `.env.production` or `.env.development`) and update with your PingFederate credentials:
    ```
-   CLIENT_ID=your_client_id
-   PING_BASE_URL=https://your-pingfederate-server
+   VITE_STAFF_CLIENT_ID=your_client_id
+   VITE_PING_BASE_URL=https://your-pingfederate-server
    ```
 
 ## Running the application
