@@ -23,7 +23,12 @@ async function generateCodeVerifierAndChallenge() {
 
 async function exchangeCodeForToken(code: string, codeVerifier: string, clientId: string) {
   const pingBaseUrl = import.meta.env.VITE_PING_BASE_URL;
-  const tokenEndpoint = pingBaseUrl.replace('authorization.oauth2', 'token.oauth2');
+  const tokenEndpoint = pingBaseUrl.includes('/as/token.oauth2')
+    ? pingBaseUrl
+    : pingBaseUrl.includes('/as/authorization.oauth2')
+      ? pingBaseUrl.replace('authorization.oauth2', 'token.oauth2')
+      : `${pingBaseUrl.replace(/\/$/, '')}/as/token.oauth2`;
+
   const redirectUri = `${window.location.origin}/callback`;
 
   const params = new URLSearchParams({
@@ -118,6 +123,10 @@ function App() {
 
   const handleLogin = async (clientId: string) => {
     const pingBaseUrl = import.meta.env.VITE_PING_BASE_URL;
+    const authEndpoint = pingBaseUrl.includes('/as/authorization.oauth2')
+      ? pingBaseUrl
+      : `${pingBaseUrl.replace(/\/$/, '')}/as/authorization.oauth2`;
+
     const redirectUri = `${window.location.origin}/callback`;
     
     const { codeVerifier, codeChallenge } = await generateCodeVerifierAndChallenge();
@@ -126,7 +135,7 @@ function App() {
     sessionStorage.setItem('pkce_code_verifier', codeVerifier);
     sessionStorage.setItem('auth_state', state);
 
-    const authUrl = `${pingBaseUrl}?` +
+    const authUrl = `${authEndpoint}?` +
       `client_id=${clientId}` +
       `&response_type=code` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +

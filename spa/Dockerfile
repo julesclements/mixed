@@ -2,7 +2,7 @@
 FROM node:20-slim AS builder
 
 ARG VITE_STAFF_CLIENT_ID=your_staff_id_here
-ARG VITE_PING_BASE_URL=https://localhost:9031/as/authorization.oauth2
+ARG VITE_PING_BASE_URL=https://localhost:9031
 
 WORKDIR /app/spa
 
