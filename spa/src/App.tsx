@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LogIn, Copy, CheckCircle, ArrowLeft, RefreshCw } from 'lucide-react';
+import { LogIn, Copy, CheckCircle, ArrowLeft, RefreshCw, LogOut } from 'lucide-react';
 import { jwtDecode } from 'jwt-decode';
 
 async function generateCodeVerifierAndChallenge() {
@@ -63,15 +63,42 @@ function App() {
   const [copied, setCopied] = useState<'code' | 'token' | 'idToken' | null>(null);
   const [isExchanging, setIsExchanging] = useState(false);
   const [exchangeError, setExchangeError] = useState<string | null>(null);
+  const [oauthError, setOAuthError] = useState<{ error: string; description?: string; clientId?: string; redirectUri?: string } | null>(null);
+  const [showBackMenu, setShowBackMenu] = useState(false);
+
+  const getErrorGuidance = (errorCode: string): string => {
+    const guidance: Record<string, string> = {
+      server_error: 'PingFederate returned a server error. This often indicates: (1) Redirect URI mismatch - verify the callback URL is registered in your PingFederate client configuration, (2) Client configuration issue - check that the client ID and settings are correct, or (3) PingFederate server issue - check PingFederate server logs.',
+      access_denied: 'Authentication was cancelled or denied by the user or PingFederate policies.',
+      invalid_request: 'The authorization request was malformed. Check that all required parameters are present.',
+      unauthorized_client: 'The client is not authorized for the requested grant type. Verify client configuration.',
+      unsupported_response_type: 'The response type is not supported. Ensure "code" response type is configured.',
+      invalid_scope: 'One or more requested scopes are invalid. Check that "openid" scope is available.',
+      temporarily_unavailable: 'The authorization server is temporarily unavailable. Please try again later.',
+    };
+    return guidance[errorCode] || `An OAuth error occurred: ${errorCode}. Contact your administrator for assistance.`;
+  };
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
+    const error = urlParams.get('error');
+    const error_description = urlParams.get('error_description');
     const state = urlParams.get('state');
-    
-    if (code) {
+
+    if (error) {
+      const clientId = sessionStorage.getItem('auth_client_id');
+      const redirectUri = `${window.location.origin}/callback`;
+      setOAuthError({
+        error,
+        description: error_description || undefined,
+        clientId: clientId || undefined,
+        redirectUri
+      });
+      window.history.replaceState({}, document.title, '/');
+    } else if (code) {
       setAuthCode(code);
-      
+
       if (window.location.pathname === '/callback') {
         window.history.replaceState({}, document.title, '/');
       }
@@ -128,12 +155,13 @@ function App() {
       : `${pingBaseUrl.replace(/\/$/, '')}/as/authorization.oauth2`;
 
     const redirectUri = `${window.location.origin}/callback`;
-    
+
     const { codeVerifier, codeChallenge } = await generateCodeVerifierAndChallenge();
     const state = window.crypto.randomUUID();
 
     sessionStorage.setItem('pkce_code_verifier', codeVerifier);
     sessionStorage.setItem('auth_state', state);
+    sessionStorage.setItem('auth_client_id', clientId);
 
     const authUrl = `${authEndpoint}?` +
       `client_id=${clientId}` +
@@ -161,8 +189,114 @@ function App() {
     setDecodedIdToken(null);
     setDecodedAccessToken(null);
     setExchangeError(null);
+    setOAuthError(null);
     sessionStorage.clear();
   };
+
+  const handleLogoffToPing = () => {
+    const pingBaseUrl = import.meta.env.VITE_PING_BASE_URL;
+    const baseUrl = pingBaseUrl.split('/as/')[0];
+    const logoffEndpoint = `${baseUrl}/idp/startSLO.ping`;
+
+    handleLogout();
+    window.location.href = logoffEndpoint;
+  };
+
+  if (oauthError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full">
+          <div className="flex justify-center mb-6">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+              <span className="text-3xl">⚠️</span>
+            </div>
+          </div>
+          <h1 className="text-2xl font-bold text-center text-gray-900 mb-2">
+            Authentication Error
+          </h1>
+
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <h2 className="font-semibold text-red-900 mb-2">Error: {oauthError.error}</h2>
+            {oauthError.description && (
+              <p className="text-sm text-red-800 mb-3">{oauthError.description}</p>
+            )}
+            {oauthError.clientId && (
+              <p className="text-sm text-red-800 mb-2">Client ID: <code className="bg-red-100 px-2 py-1 rounded font-mono text-xs">{oauthError.clientId}</code></p>
+            )}
+            {oauthError.redirectUri && (
+              <p className="text-sm text-red-800 mb-3">Redirect URI: <code className="bg-red-100 px-2 py-1 rounded font-mono text-xs break-all">{oauthError.redirectUri}</code></p>
+            )}
+            <div className="text-sm bg-white rounded p-3 border border-red-100">
+              <p className="text-gray-700 leading-relaxed">
+                {getErrorGuidance(oauthError.error)}
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <h3 className="font-semibold text-blue-900 mb-2">Troubleshooting Steps:</h3>
+            <ul className="text-sm text-blue-800 space-y-2">
+              <li className="flex gap-2">
+                <span className="font-bold">1.</span>
+                <span>Verify the redirect URI is registered in PingFederate for this client</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="font-bold">2.</span>
+                <span>Check PingFederate server logs for detailed error information</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="font-bold">3.</span>
+                <span>Confirm the client ID matches your PingFederate configuration</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="font-bold">4.</span>
+                <span>Try again - some errors are temporary</span>
+              </li>
+            </ul>
+          </div>
+
+          <button
+            onClick={handleLogout}
+            className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (authCode && showBackMenu) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full">
+          <h1 className="text-2xl font-bold text-center text-gray-900 mb-2">
+            Welcome to Secure Auth
+          </h1>
+          <p className="text-gray-600 text-center mb-8">
+            SPA PKCE Demonstration
+          </p>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={handleLogoffToPing}
+              className="w-full px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2 font-medium"
+            >
+              <LogOut className="w-5 h-5" />
+              Log Off
+            </button>
+            <button
+              onClick={() => setShowBackMenu(false)}
+              className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 font-medium"
+            >
+              <RefreshCw className="w-5 h-5" />
+              Get User Info
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (authCode) {
     return (
@@ -303,15 +437,13 @@ function App() {
             )}
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-3 mt-6">
-            <button
-              onClick={handleLogout}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Home
-            </button>
-          </div>
+          <button
+            onClick={() => setShowBackMenu(true)}
+            className="w-full mt-6 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Home
+          </button>
         </div>
       </div>
     );
