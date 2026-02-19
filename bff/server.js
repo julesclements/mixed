@@ -254,18 +254,25 @@ async function startServer() {
             if (!origin || allowedOrigins.includes(origin)) {
               callback(null, true);
             } else {
-              console.warn(`[CORS] Origin ${origin} not allowed by configuration.`);
+              console.warn(`[CORS] Origin ${origin} not allowed by configuration. Allowed origins: ${allowedOrigins.join(', ')}`);
               callback(new Error('Not allowed by CORS'));
             }
           },
           credentials: true, // Allow cookies to be sent
           methods: ['GET', 'POST', 'OPTIONS'],
-          allowedHeaders: ['Content-Type', 'X-Correlation-ID'],
+          allowedHeaders: ['Content-Type', 'X-Correlation-ID', 'Authorization'],
           exposedHeaders: ['Set-Cookie'], // Expose Set-Cookie header to client
           maxAge: 86400, // 24 hours
         };
         app.use(cors(corsOptions)); // Enable CORS with options
         app.use(express.json()); // Middleware to parse JSON bodies
+
+        // Request logger middleware
+        app.use((req, res, next) => {
+          const correlationId = req.headers['x-correlation-id'] || 'N/A';
+          console.log(`[BFF] ${new Date().toISOString()} - ${req.method} ${req.path} - Origin: ${req.headers.origin || 'N/A'} - Correlation ID: ${correlationId}`);
+          next();
+        });
 
         const isProduction = process.env.NODE_ENV === 'production';
         const isHttps = bffBaseUrl.startsWith('https://');
@@ -501,25 +508,34 @@ async function startServer() {
 
         app.post('/api/introspect-token', async (req, res, next) => {
           const correlationIdFromHeader = req.headers['x-correlation-id'];
-          console.log(`/api/introspect-token hit. Correlation ID from header: ${correlationIdFromHeader || 'N/A'}`);
-          if (!oidcClient) return next(new Error('OIDC client not initialized.'));
-          if (!req.session.tokenSet) return res.status(401).json({ error: 'User not authenticated in BFF.' });
+          console.log(`[/api/introspect-token] Hit. Correlation ID from header: ${correlationIdFromHeader || 'N/A'}`);
+          if (!oidcClient) {
+            console.error('[/api/introspect-token] OIDC client not initialized.');
+            return next(new Error('OIDC client not initialized.'));
+          }
+          if (!req.session.tokenSet) {
+            console.warn(`[/api/introspect-token] User not authenticated in BFF. Session ID: ${req.sessionID}. Correlation ID: ${correlationIdFromHeader || 'N/A'}`);
+            return res.status(401).json({ error: 'User not authenticated in BFF.' });
+          }
           const tokenToIntrospect = req.body.token_to_introspect;
           if (!tokenToIntrospect || typeof tokenToIntrospect !== 'string') {
+            console.warn(`[/api/introspect-token] Invalid token_to_introspect provided. Correlation ID: ${correlationIdFromHeader || 'N/A'}`);
             return res.status(400).json({ error: 'token_to_introspect is required and must be a string.' });
           }
           try {
             let httpOptions;
             if (correlationIdFromHeader) {
               httpOptions = { headers: { 'X-Correlation-ID': correlationIdFromHeader } };
-              console.log(`Forwarding X-Correlation-ID ${correlationIdFromHeader} to PingFederate introspection endpoint.`);
+              console.log(`[/api/introspect-token] Forwarding X-Correlation-ID ${correlationIdFromHeader} to PingFederate introspection endpoint.`);
             } else {
-              console.log('No X-Correlation-ID to forward for introspection.');
+              console.log('[/api/introspect-token] No X-Correlation-ID to forward for introspection.');
             }
+            console.log(`[/api/introspect-token] Calling PingFederate introspection. Correlation ID: ${correlationIdFromHeader || 'N/A'}`);
             const introspectionResult = await oidcClient.introspect(tokenToIntrospect, 'access_token', httpOptions ? { httpOptions } : undefined);
+            console.log(`[/api/introspect-token] Introspection successful. Active: ${introspectionResult.active}. Correlation ID: ${correlationIdFromHeader || 'N/A'}`);
             res.json(introspectionResult);
           } catch (err) {
-            console.error(`Error during token introspection. Correlation ID: ${correlationIdFromHeader || 'N/A'}. Error: ${err.message}`, err.stack);
+            console.error(`[/api/introspect-token] Error during token introspection. Correlation ID: ${correlationIdFromHeader || 'N/A'}. Error: ${err.message}`, err.stack);
             let errorResponse = { error: 'Token introspection failed.', message: err.message };
             if (err.data) errorResponse.details = err.data;
             res.status(err.statusCode || 500).json(errorResponse);
@@ -529,8 +545,12 @@ async function startServer() {
         app.get('/api/check', async (req, res) => {
           const authHeader = req.headers.authorization;
           const jwksUri = oidcClient?.issuer?.metadata?.jwks_uri;
+          const correlationId = req.headers['x-correlation-id'] || 'N/A';
+
+          console.log(`[/api/check] Validating token. Correlation ID: ${correlationId}`);
 
           if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            console.warn(`[/api/check] Missing or invalid Authorization header. Correlation ID: ${correlationId}`);
             return res.status(402).json({
               error: 'Missing or invalid Authorization header',
               jwks_endpoint: jwksUri || 'unknown'
@@ -540,21 +560,24 @@ async function startServer() {
           const token = authHeader.split(' ')[1];
 
           if (!JWKS) {
+            console.error(`[/api/check] OIDC JWKS set not initialized. Correlation ID: ${correlationId}`);
             return res.status(500).json({ error: 'OIDC JWKS set not initialized' });
           }
 
           try {
+            console.log(`[/api/check] Attempting to verify token against JWKS: ${jwksUri}. Correlation ID: ${correlationId}`);
             const { payload } = await jose.jwtVerify(token, JWKS, {
               issuer: oidcClient.issuer.metadata.issuer,
             });
 
+            console.log(`[/api/check] Token validation successful for sub: ${payload.sub}. Correlation ID: ${correlationId}`);
             res.status(200).json({
               status: 'valid',
               jwks_endpoint: jwksUri,
               payload
             });
           } catch (err) {
-            console.error('Token validation failed:', err.message);
+            console.error(`[/api/check] Token validation failed: ${err.message}. Correlation ID: ${correlationId}`);
             res.status(402).json({
               status: 'invalid',
               error: err.message,
@@ -568,9 +591,10 @@ async function startServer() {
           const hasUserInfo = !!req.session.userInfo;
           const hasTokenSet = !!req.session.tokenSet;
 
-          console.log(`/api/user hit. Correlation ID from header: ${correlationIdFromHeader || 'N/A'}. Session ID: ${req.sessionID}. Has userInfo: ${hasUserInfo}, Has tokenSet: ${hasTokenSet}`);
+          console.log(`[/api/user] Hit. Correlation ID: ${correlationIdFromHeader || 'N/A'}. Session ID: ${req.sessionID}. Has userInfo: ${hasUserInfo}, Has tokenSet: ${hasTokenSet}`);
 
           if (hasUserInfo && hasTokenSet) {
+            console.log(`[/api/user] Returning user info for session: ${req.sessionID}. Correlation ID: ${correlationIdFromHeader || 'N/A'}`);
             res.json({
               message: "User is authenticated. Token details below.",
               id_token: req.session.tokenSet.id_token,
@@ -578,6 +602,7 @@ async function startServer() {
               claims: req.session.userInfo
             });
           } else {
+            console.warn(`[/api/user] User not authenticated or session incomplete. Session ID: ${req.sessionID}. Correlation ID: ${correlationIdFromHeader || 'N/A'}`);
             res.status(401).json({ error: 'User not authenticated or session incomplete.' });
           }
         });
