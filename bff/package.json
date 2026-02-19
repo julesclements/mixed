@@ -16,6 +16,7 @@
     "dotenv": "^16.5.0",
     "express": "^4.21.2",
     "express-session": "^1.18.1",
+    "jose": "^4.15.9",
     "openid-client": "^5.7.1"
   }
 }
