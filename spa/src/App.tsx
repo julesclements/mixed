@@ -66,6 +66,8 @@ function App() {
   const [oauthError, setOAuthError] = useState<{ error: string; description?: string; clientId?: string; redirectUri?: string } | null>(null);
   const [showBackMenu, setShowBackMenu] = useState(false);
   const [codeRefreshMessage, setCodeRefreshMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [isChecking, setIsChecking] = useState(false);
+  const [checkResult, setCheckResult] = useState<{ status: number; body: any } | null>(null);
 
   const getErrorGuidance = (errorCode: string): string => {
     const guidance: Record<string, string> = {
@@ -229,6 +231,37 @@ function App() {
     window.location.href = authUrl;
   };
 
+  const handleCheckToken = async () => {
+    if (!accessToken) return;
+    setIsChecking(true);
+    setCheckResult(null);
+
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+
+    try {
+      const response = await fetch(`${apiBaseUrl.replace(/\/$/, '')}/api/check`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+
+      const body = await response.json();
+      setCheckResult({
+        status: response.status,
+        body: body,
+      });
+    } catch (error) {
+      console.error('Failed to check token:', error);
+      setCheckResult({
+        status: 500,
+        body: { error: 'Failed to connect to BFF API', message: error instanceof Error ? error.message : 'Unknown error' },
+      });
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
   const copyToClipboard = async (type: 'code' | 'token' | 'idToken', text: string) => {
     await navigator.clipboard.writeText(text);
     setCopied(type);
@@ -243,6 +276,7 @@ function App() {
     setDecodedAccessToken(null);
     setExchangeError(null);
     setOAuthError(null);
+    setCheckResult(null);
     sessionStorage.clear();
   };
 
@@ -346,6 +380,7 @@ function App() {
                 setIdToken(null);
                 setDecodedAccessToken(null);
                 setDecodedIdToken(null);
+                setCheckResult(null);
               }}
               className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 font-medium"
             >
@@ -450,6 +485,29 @@ function App() {
                       <Copy className="w-5 h-5 text-gray-500" />
                     )}
                   </button>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-3">
+                  <button
+                    onClick={handleCheckToken}
+                    disabled={isChecking}
+                    className="w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isChecking ? (
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-5 h-5" />
+                    )}
+                    {isChecking ? 'Checking...' : 'Check Token (BFF)'}
+                  </button>
+                  {checkResult && (
+                    <div className={`p-4 rounded-lg text-sm ${checkResult.status === 200 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      <p><strong>Status:</strong> {checkResult.status}</p>
+                      <div className="mt-2 bg-white bg-opacity-50 p-2 rounded font-mono text-xs overflow-auto max-h-40">
+                        <pre>{JSON.stringify(checkResult.body, null, 2)}</pre>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {decodedAccessToken && (

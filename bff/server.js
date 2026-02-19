@@ -5,14 +5,14 @@ const express = require('express');
 const session = require('express-session');
 const { Issuer, custom } = require('openid-client');
 const https = require('https');
+const jose = require('jose');
 const crypto = require('crypto');
 const cors = require('cors'); // Moved to top-level requires
 const path = require('path');
 
 const app = express(); // Define app instance at a higher scope
 let oidcClient; // Define oidcClient at a higher scope
-
-// --- Configuration Constants ---
+let JWKS; // Global JWKS set for token validation
 const port = process.env.BFF_PORT || 3001;
 const pingIssuerUrl = process.env.PING_ISSUER_URL;
 const pingBrowserFacingBaseUrl = process.env.PING_BROWSER_FACING_BASE_URL || ""; // Read new env var
@@ -232,6 +232,19 @@ async function startServer() {
           redirect_uris: [redirectUri],
           response_types: ['code'],
         });
+
+        // Initialize JWKS set for /api/check endpoint (caching and rotation handled by jose)
+        const jwksUri = oidcClient.issuer.metadata.jwks_uri;
+        if (jwksUri) {
+          const jwksOptions = {};
+          if (allowSelfSignedCerts && customAgent) {
+            jwksOptions.agent = customAgent;
+          }
+          JWKS = jose.createRemoteJWKSet(new URL(jwksUri), jwksOptions);
+          console.log(`[OIDC Setup] Initialized JWKS set for token validation: ${jwksUri}`);
+        } else {
+          console.warn('[OIDC Setup] JWKS URI not found in issuer metadata. /api/check will not work.');
+        }
 
         // --- Express Middleware Setup (Should be configured before routes) ---
         // CORS options - critical for cross-site requests
@@ -510,6 +523,43 @@ async function startServer() {
             let errorResponse = { error: 'Token introspection failed.', message: err.message };
             if (err.data) errorResponse.details = err.data;
             res.status(err.statusCode || 500).json(errorResponse);
+          }
+        });
+
+        app.get('/api/check', async (req, res) => {
+          const authHeader = req.headers.authorization;
+          const jwksUri = oidcClient?.issuer?.metadata?.jwks_uri;
+
+          if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(402).json({
+              error: 'Missing or invalid Authorization header',
+              jwks_endpoint: jwksUri || 'unknown'
+            });
+          }
+
+          const token = authHeader.split(' ')[1];
+
+          if (!JWKS) {
+            return res.status(500).json({ error: 'OIDC JWKS set not initialized' });
+          }
+
+          try {
+            const { payload } = await jose.jwtVerify(token, JWKS, {
+              issuer: oidcClient.issuer.metadata.issuer,
+            });
+
+            res.status(200).json({
+              status: 'valid',
+              jwks_endpoint: jwksUri,
+              payload
+            });
+          } catch (err) {
+            console.error('Token validation failed:', err.message);
+            res.status(402).json({
+              status: 'invalid',
+              error: err.message,
+              jwks_endpoint: jwksUri
+            });
           }
         });
 
