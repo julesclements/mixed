@@ -237,9 +237,12 @@ function App() {
     setCheckResult(null);
 
     const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+    const checkUrl = `${apiBaseUrl.replace(/\/$/, '')}/api/check`;
+
+    console.log(`[SPA] Calling BFF token validation: ${checkUrl} from origin: ${window.location.origin}`);
 
     try {
-      const response = await fetch(`${apiBaseUrl.replace(/\/$/, '')}/api/check`, {
+      const response = await fetch(checkUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -253,9 +256,15 @@ function App() {
       });
     } catch (error) {
       console.error('Failed to check token:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       setCheckResult({
         status: 500,
-        body: { error: 'Failed to connect to BFF API', message: error instanceof Error ? error.message : 'Unknown error' },
+        body: {
+          error: 'Failed to connect to BFF API',
+          message: errorMessage,
+          details: `Check if the BFF is running at ${apiBaseUrl} and allows CORS from ${window.location.origin}. If this is a 'Failed to fetch' error, it often indicates a CORS rejection, a network issue, or an invalid/unreachable URL.`,
+          target_url: checkUrl
+        },
       });
     } finally {
       setIsChecking(false);
