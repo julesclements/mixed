@@ -45,14 +45,14 @@ This project uses environment variables for configuration. You should create `.e
 
 | Variable | Description |
 | :--- | :--- |
-| `VITE_VENDOR_CLIENT_ID` | OIDC Client ID for vendor login. |
+| `VITE_STAFF_CLIENT_ID` | OIDC Client ID for vendor login. |
 | `VITE_PING_BASE_URL` | The authorization endpoint for PingFederate. |
 
 ### Single Page Application (`/spa/.env`)
 
 | Variable | Description |
 | :--- | :--- |
-| `VITE_VENDOR_CLIENT_ID` | OIDC Client ID for vendor login. |
+| `VITE_STAFF_CLIENT_ID` | OIDC Client ID for vendor login. |
 | `VITE_PING_BASE_URL` | The authorization endpoint for PingFederate. |
 | `VITE_SPA_PORT` | The port on which the SPA development server will listen (default is `5173`). |
 
