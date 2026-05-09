@@ -121,7 +121,7 @@ function App() {
         throw new Error('Missing required authentication data');
       }
 
-      const clientId = import.meta.env.VITE_STAFF_CLIENT_ID;
+      const clientId = import.meta.env.VITE_VENDOR_CLIENT_ID;
 
       const data = await exchangeCodeForToken(
         authCode,
@@ -156,7 +156,7 @@ function App() {
         setCodeRefreshMessage(null);
 
         try {
-          const clientId = import.meta.env.VITE_STAFF_CLIENT_ID;
+          const clientId = import.meta.env.VITE_VENDOR_CLIENT_ID;
           const pingBaseUrl = import.meta.env.VITE_PING_BASE_URL;
           const authEndpoint = pingBaseUrl.includes('/as/authorization.oauth2')
             ? pingBaseUrl
@@ -599,11 +599,11 @@ function App() {
         </p>
         <div className="flex flex-col gap-4">
           <button
-            onClick={() => handleLogin(import.meta.env.VITE_STAFF_CLIENT_ID)}
+            onClick={() => handleLogin(import.meta.env.VITE_VENDOR_CLIENT_ID)}
             className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
           >
             <LogIn className="w-5 h-5" />
-            Staff Sign-in
+            Vendor Sign-in
           </button>
         </div>
       </div>
