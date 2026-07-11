@@ -66,8 +66,6 @@ function App() {
   const [oauthError, setOAuthError] = useState<{ error: string; description?: string; clientId?: string; redirectUri?: string } | null>(null);
   const [showBackMenu, setShowBackMenu] = useState(false);
   const [codeRefreshMessage, setCodeRefreshMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const [isChecking, setIsChecking] = useState(false);
-  const [checkResult, setCheckResult] = useState<{ status: number; body: any } | null>(null);
 
   const getErrorGuidance = (errorCode: string): string => {
     const guidance: Record<string, string> = {
@@ -78,8 +76,6 @@ function App() {
       unsupported_response_type: 'The response type is not supported. Ensure "code" response type is configured.',
       invalid_scope: 'One or more requested scopes are invalid. Check that "openid" scope is available.',
       temporarily_unavailable: 'The authorization server is temporarily unavailable. Please try again later.',
-      interaction_required: 'The authorization server requires user interaction. Please sign in again.',
-      consent_required: 'The authorization server requires user consent. Please sign in again.',
     };
     return guidance[errorCode] || `An OAuth error occurred: ${errorCode}. Contact your administrator for assistance.`;
   };
@@ -182,7 +178,7 @@ function App() {
 
           setCodeRefreshMessage({
             type: 'success',
-            message: 'Authorization code expired or used. Redirecting to PingFederate for a new one...'
+            message: 'New Authorization code refreshed'
           });
 
           setTimeout(() => {
@@ -231,46 +227,6 @@ function App() {
     window.location.href = authUrl;
   };
 
-  const handleCheckToken = async () => {
-    if (!accessToken) return;
-    setIsChecking(true);
-    setCheckResult(null);
-
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
-    const checkUrl = `${apiBaseUrl.replace(/\/$/, '')}/api/check`;
-
-    console.log(`[SPA] Calling BFF token validation: ${checkUrl} from origin: ${window.location.origin}`);
-
-    try {
-      const response = await fetch(checkUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      });
-
-      const body = await response.json();
-      setCheckResult({
-        status: response.status,
-        body: body,
-      });
-    } catch (error) {
-      console.error('Failed to check token:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      setCheckResult({
-        status: 500,
-        body: {
-          error: 'Failed to connect to BFF API',
-          message: errorMessage,
-          details: `Check if the BFF is running at ${apiBaseUrl} and allows CORS from ${window.location.origin}. If this is a 'Failed to fetch' error, it often indicates a CORS rejection, a network issue, or an invalid/unreachable URL.`,
-          target_url: checkUrl
-        },
-      });
-    } finally {
-      setIsChecking(false);
-    }
-  };
-
   const copyToClipboard = async (type: 'code' | 'token' | 'idToken', text: string) => {
     await navigator.clipboard.writeText(text);
     setCopied(type);
@@ -285,7 +241,6 @@ function App() {
     setDecodedAccessToken(null);
     setExchangeError(null);
     setOAuthError(null);
-    setCheckResult(null);
     sessionStorage.clear();
   };
 
@@ -382,15 +337,7 @@ function App() {
               Log Off
             </button>
             <button
-              onClick={() => {
-                setShowBackMenu(false);
-                setExchangeError(null);
-                setAccessToken(null);
-                setIdToken(null);
-                setDecodedAccessToken(null);
-                setDecodedIdToken(null);
-                setCheckResult(null);
-              }}
+              onClick={() => setShowBackMenu(false)}
               className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 font-medium"
             >
               <RefreshCw className="w-5 h-5" />
@@ -496,29 +443,6 @@ function App() {
                   </button>
                 </div>
 
-                <div className="mt-4 flex flex-col gap-3">
-                  <button
-                    onClick={handleCheckToken}
-                    disabled={isChecking}
-                    className="w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isChecking ? (
-                      <RefreshCw className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <CheckCircle className="w-5 h-5" />
-                    )}
-                    {isChecking ? 'Checking...' : 'Check Token (BFF)'}
-                  </button>
-                  {checkResult && (
-                    <div className={`p-4 rounded-lg text-sm ${checkResult.status === 200 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                      <p><strong>Status:</strong> {checkResult.status}</p>
-                      <div className="mt-2 bg-white bg-opacity-50 p-2 rounded font-mono text-xs overflow-auto max-h-40">
-                        <pre>{JSON.stringify(checkResult.body, null, 2)}</pre>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
                 {decodedAccessToken && (
                   <div className="mt-4">
                     <h3 className="text-md font-semibold text-gray-900 mb-2">
@@ -603,7 +527,7 @@ function App() {
             className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
           >
             <LogIn className="w-5 h-5" />
-            Vendor Sign-in
+            Staff Sign-in
           </button>
         </div>
       </div>
