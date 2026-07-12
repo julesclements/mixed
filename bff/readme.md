@@ -1,6 +1,8 @@
 ## BFF Development
 
-> For deployment guidance, see parent readme.
+- [![Open in Bolt](https://bolt.new/static/open-in-bolt.svg)](https://bolt.new/) jclempaypal-agent
+- [<img src="https://dl.svgcdn.com/png/simple-icons/googlejules-800.png" alt="Google Jules Icon" width="24" height="24" style="vertical-align:middle">](https://jules.google.com) jclempaypal@gmail.com
+- [<img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/openai.svg" alt="ChatGPT Codex Logo" width="24" height="24" style="vertical-align:middle">](https://chatgpt.com/codex/cloud/) jclempaypal@gmail.com
 
 The BFF handles the OIDC interaction with PingFederate, manages the user's session, and serves user data to the client.
 It uses `express-session` for session management and `openid-client` for OIDC interactions.

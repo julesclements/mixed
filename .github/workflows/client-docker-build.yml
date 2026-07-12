@@ -63,7 +63,7 @@ jobs:
           path: coverage/
           retention-days: 14
 
-  build-and-push-client: # Job name specific to client
+  build-and-push: # Job name specific to client
     needs: test        # <-- waits for the test job to finish and succeed
     runs-on: ubuntu-latest
     permissions:
@@ -82,7 +82,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push Client Docker image
+      - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: ./client # Context is the client directory

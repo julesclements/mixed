@@ -7,8 +7,18 @@ const { Issuer, custom } = require('openid-client');
 const https = require('https');
 const jose = require('jose');
 const crypto = require('crypto');
-const cors = require('cors'); // Moved to top-level requires
+const cors = require('cors');
 const path = require('path');
+const {
+  escapeHtml,
+  getMatchingRedirectUrl: getMatchingRedirectUrlHelper,
+  validateEnvVars,
+  buildCorsOptions,
+  buildSessionConfig,
+  shouldUseSecureCookies,
+  parseList,
+  correctIssuerMetadata,
+} = require('./lib');
 
 const app = express(); // Define app instance at a higher scope
 let oidcClient; // Define oidcClient at a higher scope
@@ -21,40 +31,15 @@ const clientSecret = process.env.PING_CLIENT_SECRET;
 const sessionSecret = process.env.SESSION_SECRET;
 const bffBaseUrl = process.env.BFF_BASE_URL || `http://localhost:${port}`;
 const redirectUri = `${bffBaseUrl}/auth/callback`;
-const allowedOrigins = process.env.FRONTEND_ORIGIN ? process.env.FRONTEND_ORIGIN.split(',').map(o => o.trim()) : [];
-const allowedRedirectUrls = process.env.FRONTEND_REDIRECT_URL ? process.env.FRONTEND_REDIRECT_URL.split(',').map(u => u.trim()) : [];
+const allowedOrigins = parseList(process.env.FRONTEND_ORIGIN);
+const allowedRedirectUrls = parseList(process.env.FRONTEND_REDIRECT_URL);
 const allowSelfSignedCerts = process.env.ALLOW_SELF_SIGNED_CERTS === 'true';
 
 /**
- * Helper to determine the best redirect URL based on the request's Referer header.
- * Matches the Referer origin against allowedOrigins to find the corresponding allowedRedirectUrls entry.
+ * Wrapper that passes the request's Referer header to the lib helper.
  */
 function getMatchingRedirectUrl(req) {
-  const referer = req.headers.referer;
-  if (referer) {
-    try {
-      const refererUrl = new URL(referer);
-      const refererOrigin = refererUrl.origin;
-      const index = allowedOrigins.indexOf(refererOrigin);
-      if (index !== -1 && allowedRedirectUrls[index]) {
-        return allowedRedirectUrls[index];
-      }
-      // Fallback: search for any allowed redirect URL that is a prefix of the referer
-      const matchingUrl = allowedRedirectUrls.find(url => referer.startsWith(url));
-      if (matchingUrl) {
-        return matchingUrl;
-      }
-    } catch (e) {
-      // Ignore invalid URL
-    }
-  }
-  return allowedRedirectUrls[0];
-}
-
-// --- Helper Functions ---
-function escapeHtml(unsafe) {
-  if (typeof unsafe !== 'string') return '';
-  return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  return getMatchingRedirectUrlHelper(req.headers.referer, allowedOrigins, allowedRedirectUrls);
 }
 
 // --- Main Server Startup Logic with OIDC Discovery ---
@@ -64,11 +49,11 @@ async function startServer() {
     console.log(`[OIDC Config] PING_ISSUER_URL (for BFF server-to-server calls): ${pingIssuerUrl}`);
     console.log(`[OIDC Config] PING_BROWSER_FACING_BASE_URL (for browser redirects, optional): ${pingBrowserFacingBaseUrl || 'Not set, will use PING_ISSUER_URL or its localhost-corrected version'}`);
 
-    if (!pingIssuerUrl || !clientId || !clientSecret || !sessionSecret ||
-        allowedOrigins.length === 0 || allowedRedirectUrls.length === 0 || !bffBaseUrl) {
-      const errorMsg = 'Missing critical environment variables. Please check your .env file. Ensure PING_ISSUER_URL, PING_CLIENT_ID, PING_CLIENT_SECRET, SESSION_SECRET, FRONTEND_ORIGIN, FRONTEND_REDIRECT_URL, and BFF_BASE_URL are set.';
+    const envValidation = validateEnvVars(process.env);
+    if (!envValidation.valid) {
+      const errorMsg = `Missing critical environment variables: ${envValidation.missing.join(', ')}. Please check your .env file.`;
       console.error(errorMsg);
-      return reject(new Error(errorMsg)); // Reject promise if config is missing
+      return reject(new Error(errorMsg));
     }
 
     let customAgent;
@@ -85,120 +70,6 @@ async function startServer() {
     const originalHttpOptions = Issuer[custom.http_options];
     if (allowSelfSignedCerts && customAgent) {
       Issuer[custom.http_options] = (options) => ({ ...options, agent: customAgent });
-    }
-
-    // OIDC metadata correction function (Attempt 5 - Simplified Issuer Logic)
-    function correctIssuerMetadata(metadata, internalBaseUrlString, browserFacingBaseUrlString) {
-      const newMetadata = JSON.parse(JSON.stringify(metadata)); // Deep copy
-      let internalUrlObj;
-      try {
-        internalUrlObj = new URL(internalBaseUrlString);
-      } catch (e) {
-        console.error(`[OIDC Meta] Invalid PING_ISSUER_URL: ${internalBaseUrlString}. Cannot proceed. Error: ${e.message}`);
-        return metadata; // Return original metadata if internal URL is critically invalid
-      }
-
-      let browserFacingUrlObj = null;
-      if (browserFacingBaseUrlString && browserFacingBaseUrlString.trim() !== "") {
-        try {
-          browserFacingUrlObj = new URL(browserFacingBaseUrlString);
-          console.log('[OIDC Meta] Will use explicit browser-facing base URL for applicable parts:', browserFacingBaseUrlString);
-        } catch (e) {
-          console.warn(`[OIDC Meta] Invalid PING_BROWSER_FACING_BASE_URL '${browserFacingBaseUrlString}'. It will not be used. Error: ${e.message}`);
-          browserFacingUrlObj = null;
-        }
-      } else {
-        console.log('[OIDC Meta] No PING_BROWSER_FACING_BASE_URL provided.');
-      }
-
-      const isSplitUrlScenario = browserFacingUrlObj && browserFacingUrlObj.hostname !== internalUrlObj.hostname;
-      console.log(`[OIDC Meta] Is split URL scenario? ${isSplitUrlScenario}`);
-
-      // --- Refined issuer property handling (Attempt 5) ---
-      const originalDiscoveredIssuer = newMetadata.issuer; // For logging and as a base
-      let finalIssuerValue = originalDiscoveredIssuer; // Default to original
-
-      if (typeof originalDiscoveredIssuer === 'string') { // Ensure issuer is a string before trying to parse/compare
-        try {
-            if (isSplitUrlScenario) {
-                // Prefer the exact browser-facing URL string for 'issuer' in split URL scenarios.
-                finalIssuerValue = browserFacingBaseUrlString;
-            } else {
-                const discoveredIssuerUrl = new URL(originalDiscoveredIssuer);
-                if (internalUrlObj.hostname === 'localhost' && discoveredIssuerUrl.hostname === 'localhost') {
-                    // Both PING_ISSUER_URL and discovered issuer are localhost. Use PING_ISSUER_URL string directly.
-                    finalIssuerValue = internalBaseUrlString;
-                } else if (internalUrlObj.hostname !== 'localhost' && discoveredIssuerUrl.hostname === 'localhost') {
-                    // PING_ISSUER_URL is external, but discovered is localhost. Reconstruct with PING_ISSUER_URL's base.
-                    discoveredIssuerUrl.protocol = internalUrlObj.protocol;
-                    discoveredIssuerUrl.hostname = internalUrlObj.hostname;
-                    discoveredIssuerUrl.port = internalUrlObj.port;
-                    // Path is kept from originalDiscoveredIssuer
-                    finalIssuerValue = discoveredIssuerUrl.toString();
-                }
-                // Else: Discovered issuer is not localhost OR (internal is external and discovered is external and they match or differ - preserve original)
-                // This also covers cases where PING_ISSUER_URL is external and matches the discovered external URL.
-            }
-
-            // Normalize: remove trailing slash if it's the only char in path (e.g. "http://host/" -> "http://host")
-            // but keep "http://host/path/" as is.
-            if (finalIssuerValue.endsWith('/') && new URL(finalIssuerValue).pathname === '/') {
-                finalIssuerValue = finalIssuerValue.slice(0, -1);
-            }
-
-        } catch (e) {
-            console.warn(`[OIDC Meta] Error processing 'issuer' value '${originalDiscoveredIssuer}': ${e.message}. Original will be used.`);
-            finalIssuerValue = originalDiscoveredIssuer; // Fallback to original on error
-        }
-
-        if (newMetadata.issuer !== finalIssuerValue) {
-            console.log(`[OIDC Meta] Set 'issuer': ${newMetadata.issuer} -> ${finalIssuerValue}`);
-            newMetadata.issuer = finalIssuerValue;
-        }
-      } else {
-        console.warn(`[OIDC Meta] Original 'issuer' in metadata is not a string: ${originalDiscoveredIssuer}. Skipping 'issuer' correction.`);
-      }
-
-      // --- Endpoint Handling (same as Attempt 4) ---
-      for (const key of Object.keys(newMetadata)) {
-        if (key === 'issuer') {
-          continue; // Already handled
-        }
-        const currentValue = newMetadata[key];
-        if (typeof currentValue !== 'string') {
-          continue;
-        }
-
-        const isBrowserFacingEndpoint = ['authorization_endpoint', 'end_session_endpoint'].includes(key);
-        let targetObj = null;
-        let correctionType = '';
-
-        if (isBrowserFacingEndpoint && browserFacingUrlObj) {
-          targetObj = browserFacingUrlObj;
-          correctionType = 'BROWSER-FACING';
-        } else if (currentValue.includes('://localhost') && internalUrlObj.hostname !== 'localhost') {
-          targetObj = internalUrlObj;
-          correctionType = 'INTERNAL from localhost';
-        }
-
-        if (targetObj) {
-          try {
-            let endpointUrl = new URL(currentValue);
-            endpointUrl.protocol = targetObj.protocol;
-            endpointUrl.hostname = targetObj.hostname;
-            endpointUrl.port = targetObj.port;
-            // Path and query params are preserved from 'currentValue' by default with new URL() and selective part setting.
-            if (newMetadata[key] !== endpointUrl.toString()) {
-              console.log(`[OIDC Meta] Corrected ${correctionType} '${key}': ${newMetadata[key]} -> ${endpointUrl.toString()}`);
-              newMetadata[key] = endpointUrl.toString();
-            }
-          } catch (e) {
-            console.warn(`[OIDC Meta] Error correcting ${correctionType} '${key}' URL '${currentValue}': ${e.message}. Skipping.`);
-          }
-        }
-      }
-      console.log('[OIDC Meta] Finished metadata correction. Resulting metadata:', JSON.stringify(newMetadata, null, 2));
-      return newMetadata;
     }
 
     Issuer.discover(pingIssuerUrl)
@@ -247,24 +118,8 @@ async function startServer() {
         }
 
         // --- Express Middleware Setup (Should be configured before routes) ---
-        // CORS options - critical for cross-site requests
-        const corsOptions = {
-          origin: function (origin, callback) {
-            // Allow requests with no origin (like mobile apps or curl requests)
-            if (!origin || allowedOrigins.includes(origin)) {
-              callback(null, true);
-            } else {
-              console.warn(`[CORS] Origin ${origin} not allowed by configuration. Allowed origins: ${allowedOrigins.join(', ')}`);
-              callback(new Error('Not allowed by CORS'));
-            }
-          },
-          credentials: true, // Allow cookies to be sent
-          methods: ['GET', 'POST', 'OPTIONS'],
-          allowedHeaders: ['Content-Type', 'X-Correlation-ID', 'Authorization'],
-          exposedHeaders: ['Set-Cookie'], // Expose Set-Cookie header to client
-          maxAge: 86400, // 24 hours
-        };
-        app.use(cors(corsOptions)); // Enable CORS with options
+        const corsOptions = buildCorsOptions(allowedOrigins);
+        app.use(cors(corsOptions));
         app.use(express.json()); // Middleware to parse JSON bodies
 
         // Request logger middleware
@@ -274,28 +129,14 @@ async function startServer() {
           next();
         });
 
-        const isProduction = process.env.NODE_ENV === 'production';
-        const isHttps = bffBaseUrl.startsWith('https://');
-        const useSecureCookies = isProduction || isHttps;
+        const useSecureCookies = shouldUseSecureCookies(process.env.NODE_ENV, bffBaseUrl);
 
         if (useSecureCookies) {
           app.set('trust proxy', 1);
           console.log('[Session] Trust proxy enabled and secure cookies will be used (HTTPS or production).');
         }
 
-        app.use(session({
-          secret: sessionSecret,
-          resave: false,
-          saveUninitialized: true, // Changed to true to create session before redirect
-          cookie: {
-            secure: useSecureCookies,
-            httpOnly: true,
-            maxAge: 24 * 60 * 60 * 1000,
-            sameSite: useSecureCookies ? 'None' : 'Lax',
-            // Cross-site scenarios require SameSite=None; Secure
-            // Note: Browsers will block third-party cookies unless explicitly allowed
-          }
-        }));
+        app.use(session(buildSessionConfig(sessionSecret, useSecureCookies)));
 
         // Favicon serving
         app.get('/favicon.ico', (req, res) => {
