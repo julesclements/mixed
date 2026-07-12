@@ -17,22 +17,25 @@ jobs:
     defaults:
       run:
         working-directory: client   # <-- applies to all `run:` steps in this job
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '20' # Specify Node.js version 20
+          node-version: 22
+          cache: npm
           cache-dependency-path: client/package-lock.json
 
       - name: Install dependencies
-        working-directory: ./client # Specify working directory for this step
-        run: npm install
+        run: npm ci
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
 
       - name: Build application
-        working-directory: ./client # Specify working directory for this step
         run: npm run build # This runs: parcel build index.html --dist-dir docs --public-url ./
 
       - name: Setup Pages
@@ -40,8 +43,29 @@ jobs:
         uses: actions/configure-pages@v4
         # No working-directory needed here as it operates on repository/GitHub settings
 
+      - name: Display coverage summary in job summary
+        if: always()
+        run: |
+          echo "## Test & Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f coverage/coverage-summary.json ]; then
+            echo "| File | Lines | Statements | Functions | Branches |" >> $GITHUB_STEP_SUMMARY
+            echo "|------|-------|-------------|-----------|----------|" >> $GITHUB_STEP_SUMMARY
+            node -e "
+              const fs = require('fs');
+              const data = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+              for (const [file, m] of Object.entries(data)) {
+                const name = file.split('/').slice(-2).join('/');
+                const fmt = (c) => \`\${c.pct}% (\${c.covered}/\${c.total})\`;
+                console.log(\`| \${name} | \${fmt(m.lines)} | \${fmt(m.statements)} | \${fmt(m.functions)} | \${fmt(m.branches)} |\`);
+              }
+            " >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Coverage summary not found." >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v7
         with:
           # Path to the directory containing the built files.
           # Parcel builds to 'docs' inside the 'client' directory.
