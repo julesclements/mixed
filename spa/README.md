@@ -1,6 +1,8 @@
 # PingFederate Authentication App
 
-> For deployment guidance, see parent readme.
+- [![Open in Bolt](https://bolt.new/static/open-in-bolt.svg)](https://bolt.new/) cloudygoodness@gmail.com publishes to Netlify https://spa.mwnz.org
+- [<img src="https://dl.svgcdn.com/png/simple-icons/googlejules-800.png" alt="Google Jules Icon" width="24" height="24" style="vertical-align:middle">](https://jules.google.com) cloudygoodness@gmail.com
+- [<img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/openai.svg" alt="ChatGPT Codex Logo" width="24" height="24" style="vertical-align:middle">](https://chatgpt.com/codex/cloud/) cloudygoodness@gmail.com
 
 A minimal Node.js application that demonstrates authentication with PingFederate and displays the authorization code after successful sign-in.
 
