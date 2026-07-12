@@ -6,6 +6,9 @@ export interface TokenResponse {
 }
 
 export function resolveTokenEndpoint(pingBaseUrl: string): string {
+  if (!pingBaseUrl) {
+    throw new Error('pingBaseUrl is required');
+  }
   if (pingBaseUrl.includes('/as/token.oauth2')) {
     return pingBaseUrl;
   }
@@ -16,6 +19,9 @@ export function resolveTokenEndpoint(pingBaseUrl: string): string {
 }
 
 export function resolveAuthEndpoint(pingBaseUrl: string): string {
+  if (!pingBaseUrl) {
+    throw new Error('pingBaseUrl is required');
+  }
   if (pingBaseUrl.includes('/as/authorization.oauth2')) {
     return pingBaseUrl;
   }
@@ -23,6 +29,9 @@ export function resolveAuthEndpoint(pingBaseUrl: string): string {
 }
 
 export function resolveLogoffEndpoint(pingBaseUrl: string): string {
+  if (!pingBaseUrl) {
+    throw new Error('pingBaseUrl is required');
+  }
   const baseUrl = pingBaseUrl.split('/as/')[0];
   return `${baseUrl}/idp/startSLO.ping`;
 }

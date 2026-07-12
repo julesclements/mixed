@@ -144,7 +144,20 @@ function App() {
   };
 
   const handleLogin = async (clientId: string) => {
-    await redirectToAuth(clientId);
+    try {
+      if (!clientId) {
+        throw new Error('VITE_STAFF_CLIENT_ID is not defined. Please check your environment configuration.');
+      }
+      await redirectToAuth(clientId);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Login failed';
+      setOAuthError({
+        error: 'Configuration Error',
+        description: errorMsg,
+        clientId: clientId || undefined,
+        redirectUri,
+      });
+    }
   };
 
   const handleCheckToken = async () => {
