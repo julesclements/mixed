@@ -1,6 +1,8 @@
 ## Client Development
 
-> For deployment guidance, see parent readme.
+- [![Open in Bolt](https://bolt.new/static/open-in-bolt.svg)](https://bolt.new/) jclempaypal-agent
+- [<img src="https://dl.svgcdn.com/png/simple-icons/googlejules-800.png" alt="Google Jules Icon" width="24" height="24" style="vertical-align:middle">](https://jules.google.com) jclempaypal@gmail.com
+- [<img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/openai.svg" alt="ChatGPT Codex Logo" width="24" height="24" style="vertical-align:middle">](https://chatgpt.com/codex/cloud/) jclempaypal@gmail.com
 
 The client is a static Javascript application that makes API calls to the BFF.
 

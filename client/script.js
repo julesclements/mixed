@@ -1,5 +1,7 @@
 // client/script.js
 
+import { generateUUIDv4, decodeJwtPayload, escapeHtml, resolveBffBaseUrl } from './lib.js';
+
 let loginButton, fetchUserButton, logoutButton, userInfoDiv, errorMessageDiv, introspectionSection;
 let bffBaseUrl = '';
 let currentCorrelationId = null;
@@ -13,12 +15,6 @@ if (storedCorrelationId) {
 
 // --- Helper Functions ---
 
-function generateUUIDv4() {
-  return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
-    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
-  );
-}
-
 function ensureCorrelationId() {
   if (!currentCorrelationId) {
     currentCorrelationId = generateUUIDv4();
@@ -26,22 +22,6 @@ function ensureCorrelationId() {
     console.log('Generated new X-Correlation-ID for current journey and stored in sessionStorage:', currentCorrelationId);
   }
   return currentCorrelationId;
-}
-
-function decodeJwtPayload(token) {
-  if (!token || typeof token !== 'string') { return null; }
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) { console.warn("Token does not have 3 parts."); return null; }
-    const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const decodedJson = atob(payloadBase64);
-    return JSON.parse(decodedJson);
-  } catch (e) { console.error("Failed to decode JWT payload:", e); return null; }
-}
-
-function escapeHtml(unsafe) {
-  if (typeof unsafe !== 'string') { return ''; }
-  return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
 
@@ -54,14 +34,10 @@ document.addEventListener('DOMContentLoaded', () => {
     introspectionSection = document.getElementById('introspectionSection');
 
     const hostname = window.location.hostname;
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        bffBaseUrl = 'http://localhost:3001';
-        console.log('Client running locally, BFF assumed at:', bffBaseUrl);
-    } else if (hostname === 'julesclements.github.io' || hostname === 'client.hdc.company') {
-        bffBaseUrl = 'https://mixed.hdc.company';
-        console.log('Client running on known production domain, BFF set to:', bffBaseUrl);
+    bffBaseUrl = resolveBffBaseUrl(hostname);
+    if (bffBaseUrl) {
+        console.log('BFF base URL resolved to:', bffBaseUrl);
     } else {
-        bffBaseUrl = '';
         console.log('Client running on other hostname, BFF assumed same-origin or proxied.');
     }
 

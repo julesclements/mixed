@@ -10,7 +10,57 @@ on:
   workflow_dispatch: # Allow manual triggering
 
 jobs:
+  test:
+    name: Run tests with coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+      - name: Display coverage summary in job summary
+        if: always()
+        run: |
+          echo "## Test & Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f coverage/coverage-summary.json ]; then
+            echo "| File | Lines | Statements | Functions | Branches |" >> $GITHUB_STEP_SUMMARY
+            echo "|------|-------|-------------|-----------|----------|" >> $GITHUB_STEP_SUMMARY
+            node -e "
+              const fs = require('fs');
+              const data = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+              for (const [file, m] of Object.entries(data)) {
+                const name = file.split('/').slice(-2).join('/');
+                const fmt = (c) => \`\${c.pct}% (\${c.covered}/\${c.total})\`;
+                console.log(\`| \${name} | \${fmt(m.lines)} | \${fmt(m.statements)} | \${fmt(m.functions)} | \${fmt(m.branches)} |\`);
+              }
+            " >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Coverage summary not found." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload coverage report artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 14
+
   build-and-push-client: # Job name specific to client
+    needs: test        # <-- waits for the test job to finish and succeed
     runs-on: ubuntu-latest
     permissions:
       contents: read # Needed to checkout the code

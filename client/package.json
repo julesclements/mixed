@@ -4,12 +4,18 @@
   "description": "Example Javascript app with PingFederate authentication and GitHub Pages deployment.",
   "private": true,
   "license": "UNLICENSED",
+  "type": "module",
   "scripts": {
-    "build": "parcel build index.html --dist-dir docs --public-url ./"
+    "build": "parcel build index.html --dist-dir docs --public-url ./",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {},
   "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.8",
     "parcel": "^2.9.3",
-    "process": "^0.11.10"
+    "process": "^0.11.10",
+    "vitest": "^2.1.8"
   }
 }
