@@ -1,4 +1,8 @@
- PingFederate OIDC Authentication: Client + BFF Example
+# PingFederate OIDC Authentication: Client + BFF Example
+
+- [![Open in Bolt](https://bolt.new/static/open-in-bolt.svg)](https://bolt.new/) hauraki.data.centre@gmail.com
+- [<img src="https://dl.svgcdn.com/png/simple-icons/googlejules-800.png" alt="Google Jules Icon" width="24" height="24" style="vertical-align:middle">](https://jules.google.com) hauraki.data.centre@gmail.com
+- [<img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/openai.svg" alt="ChatGPT Codex Logo" width="24" height="24" style="vertical-align:middle">](https://chatgpt.com/codex/cloud/) hauraki.data.centre@gmail.com
 
 This project demonstrates a client-server architecture where a frontend client application (served via GitHub Pages or locally) interacts with a Backend-for-Frontend (BFF) to handle OIDC authentication with PingFederate.
 
