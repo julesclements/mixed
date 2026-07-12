@@ -29,6 +29,11 @@ describe('resolveTokenEndpoint', () => {
       'https://ping.example.com/as/token.oauth2',
     );
   });
+
+  it('throws error if pingBaseUrl is falsy/undefined', () => {
+    expect(() => resolveTokenEndpoint('')).toThrow('pingBaseUrl is required');
+    expect(() => resolveTokenEndpoint(undefined as any)).toThrow('pingBaseUrl is required');
+  });
 });
 
 describe('resolveAuthEndpoint', () => {
@@ -48,6 +53,11 @@ describe('resolveAuthEndpoint', () => {
       'https://ping.example.com/as/authorization.oauth2',
     );
   });
+
+  it('throws error if pingBaseUrl is falsy/undefined', () => {
+    expect(() => resolveAuthEndpoint('')).toThrow('pingBaseUrl is required');
+    expect(() => resolveAuthEndpoint(undefined as any)).toThrow('pingBaseUrl is required');
+  });
 });
 
 describe('resolveLogoffEndpoint', () => {
@@ -61,6 +71,11 @@ describe('resolveLogoffEndpoint', () => {
     expect(resolveLogoffEndpoint('https://ping.example.com/as/token.oauth2')).toBe(
       'https://ping.example.com/idp/startSLO.ping',
     );
+  });
+
+  it('throws error if pingBaseUrl is falsy/undefined', () => {
+    expect(() => resolveLogoffEndpoint('')).toThrow('pingBaseUrl is required');
+    expect(() => resolveLogoffEndpoint(undefined as any)).toThrow('pingBaseUrl is required');
   });
 });
 
