@@ -65,7 +65,7 @@ jobs:
           fi
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v7
+        uses: actions/upload-pages-artifact@v5
         with:
           # Path to the directory containing the built files.
           # Parcel builds to 'docs' inside the 'client' directory.
