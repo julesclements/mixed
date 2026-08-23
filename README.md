@@ -3,7 +3,7 @@
 Google Jules not used as this repo is limited to the Hotmail/GitHub account.
 
 - [![Open in Bolt](https://bolt.new/static/open-in-bolt.svg)](https://bolt.new/) GitHub `julesclements`
-- [<img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/openai.svg" alt="ChatGPT Codex Logo" width="24" height="24" style="vertical-align:middle">](https://chatgpt.com/codex/cloud/) 
+- [<img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/openai.svg" alt="ChatGPT Codex Logo" width="24" height="24" style="vertical-align:middle">](https://chatgpt.com/codex/cloud/) Apple `jules.clements@hotmail.com`
 
 This project demonstrates a client-server architecture where a frontend client application (served via GitHub Pages or locally) interacts with a Backend-for-Frontend (BFF) to handle OIDC authentication with PingFederate.
 
