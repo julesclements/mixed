@@ -1,5 +1,5 @@
 # Stage 1: Build the static assets
-FROM node:24-slim AS builder
+FROM node:26-slim AS builder
 
 WORKDIR /app/client
 
@@ -17,7 +17,7 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Serve the static assets from the 'docs' directory
-FROM node:20-alpine AS runner
+FROM node:26-alpine AS runner
 
 WORKDIR /app
 

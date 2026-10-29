@@ -22,7 +22,7 @@ describe('generateCodeVerifierAndChallenge', () => {
     const fakeDigest = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     mockSubtle.digest.mockResolvedValue(fakeDigest.buffer);
 
-    const result = await generateCodeVerifierAndChallenge(mockCrypto as any);
+    const result = await generateCodeVerifierAndChallenge(mockCrypto as unknown as Crypto);
 
     expect(result.codeVerifier).toMatch(/^[0-9a-f]+$/);
     expect(result.codeVerifier.length).toBe(56);
@@ -45,7 +45,7 @@ describe('generateCodeVerifierAndChallenge', () => {
     ]);
     mockSubtle.digest.mockResolvedValue(fakeDigest.buffer);
 
-    const result = await generateCodeVerifierAndChallenge(mockCrypto as any);
+    const result = await generateCodeVerifierAndChallenge(mockCrypto as unknown as Crypto);
 
     expect(result.codeChallenge).not.toContain('+');
     expect(result.codeChallenge).not.toContain('/');

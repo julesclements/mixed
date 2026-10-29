@@ -14,8 +14,8 @@ function App() {
   const [authCode, setAuthCode] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [idToken, setIdToken] = useState<string | null>(null);
-  const [decodedIdToken, setDecodedIdToken] = useState<any | null>(null);
-  const [decodedAccessToken, setDecodedAccessToken] = useState<any | null>(null);
+  const [decodedIdToken, setDecodedIdToken] = useState<unknown | null>(null);
+  const [decodedAccessToken, setDecodedAccessToken] = useState<unknown | null>(null);
   const [copied, setCopied] = useState<'code' | 'token' | 'idToken' | null>(null);
   const [isExchanging, setIsExchanging] = useState(false);
   const [exchangeError, setExchangeError] = useState<string | null>(null);
@@ -31,7 +31,7 @@ function App() {
     message: string;
   } | null>(null);
   const [isChecking, setIsChecking] = useState(false);
-  const [checkResult, setCheckResult] = useState<{ status: number; body: any } | null>(null);
+  const [checkResult, setCheckResult] = useState<{ status: number; body: unknown } | null>(null);
 
   const pingBaseUrl = import.meta.env.VITE_PING_BASE_URL;
   const staffClientId = import.meta.env.VITE_STAFF_CLIENT_ID;
@@ -128,7 +128,7 @@ function App() {
             type: 'success',
             message: 'Authorization code expired or used. Redirecting to PingFederate for a new one...',
           });
-        } catch (refreshError) {
+        } catch {
           setCodeRefreshMessage({
             type: 'error',
             message: 'Failed to refresh authorization code',

@@ -15,17 +15,20 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "engines": {
+    "node": ">=26.12.1"
+  },
   "dependencies": {
     "cors": "^2.8.5",
-    "dotenv": "^16.5.0",
-    "express": "^4.21.2",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.3",
     "express-session": "^1.18.1",
     "jose": "^4.15.9",
     "openid-client": "^5.7.1"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^4.1.10",
-    "@vitest/ui": "^4.1.10",
-    "vitest": "^4.1.10"
+    "@vitest/coverage-v8": "^4.1.12",
+    "@vitest/ui": "^4.1.12",
+    "vitest": "^4.1.12"
   }
 }

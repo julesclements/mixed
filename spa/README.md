@@ -16,7 +16,7 @@ A minimal Node.js application that demonstrates authentication with PingFederate
 
 ## Prerequisites
 
-- Node.js (v14 or higher)
+- Node.js (v26.12.1 or higher)
 - A PingFederate server
 - A registered application in PingFederate with proper redirect URIs
 
@@ -56,8 +56,7 @@ The application will be available at `http://localhost:5173`.
 
 ## Security Considerations
 
-This is a minimal example for demonstration purposes. For production use, consider:
-
+- **Node 26 & CVE-2026-111497 (Brotli decoder RCE)**: Upgraded to Node.js 26.12.1+ runtime, which includes patched Brotli decoder binaries addressing CVE-2026-111497 (Remote Code Execution vulnerability in Brotli decompression). All dependencies have also been audited and updated.
 - Using a more secure session store
 - Implementing proper error handling
 - Adding HTTPS support

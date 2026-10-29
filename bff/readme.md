@@ -87,3 +87,41 @@ It uses `express-session` for session management and `openid-client` for OIDC in
         *   In production mode (`NODE_ENV=production`), `app.set('trust proxy', 1);` is enabled.
         *   This setting is crucial if you deploy the BFF behind a reverse proxy (e.g., Nginx, AWS ELB/ALB) that terminates TLS (handles HTTPS) and forwards requests to the BFF over HTTP.
         *   It allows Express to correctly determine that the connection was originally secure, which is essential for the `secure: true` cookie attribute to work as intended. Without it, Express might think the connection is insecure (HTTP) and refuse to set the secure cookie.
+
+## Appendix: Security Remediation History
+
+Newest entries first. Add an entry whenever a vulnerability is assessed or remediated.
+
+### Runtime requirement
+
+Node.js `>=26.12.1` is enforced via `engines` in `package.json` and `engine-strict=true` in `.npmrc`. The `Dockerfile` pins `node:26.12.1-slim` and CI (`.github/workflows/ci.yml`) uses `>=26.12.1`. Raise these together when a newer patched Node.js release is required.
+
+### 2026-10-28 - Node.js October 2026 security releases
+
+Assessed against the advisory summary only; CVE details and fixed versions were not independently verified.
+
+| CVE | Summary | Exposure in this project |
+| --- | --- | --- |
+| CVE-2026-111497 | Brotli decoder out-of-bounds write (RCE) | Not reachable on known paths. `express.json()` (body-parser 1.x) accepts only `gzip`/`deflate`/`identity` request bodies. `openid-client` 5.7.1 sends `Accept-Encoding: identity` and never decompresses. `jose` JWKS fetching was not inspected. |
+| CVE-2026-105483 | TLS hostname bypass with fullwidth-digit IPs | Runtime-level; outbound HTTPS to the OIDC issuer. Mitigated by the Node upgrade. |
+| CVE-2026-106069 | TLS hostname bypass when host loosely resolves to an IP | Runtime-level; outbound HTTPS to the OIDC issuer. Mitigated by the Node upgrade. |
+| CVE-2026-105482 | `dns.resolve` truncates names containing NUL | Low; the app does not call `dns.resolve` or resolve user-supplied hostnames. |
+
+Actions taken:
+
+- Moved the base image, CI and local runtime from Node 20 to Node 26.12.1 (`93f3772`).
+- Declared `engines.node >=26.12.1`, enabled `engine-strict`, and pinned the Docker base image to `26.12.1-slim`.
+- Note: `ALLOW_SELF_SIGNED_CERTS=true` disables certificate validation and overrides any TLS fix. It must never be set in production.
+
+### 2026-10-27 - Dependency CVE remediation
+
+- `edd8f89`, merged in `7548b49` (PR #1, Dependabot): dependency updates to remediate reported CVEs.
+- `1b5f414`: express 4.22.2 to 4.22.3 (body-parser 1.20.6 to 1.20.9), dotenv to 16.6.1, vitest and coverage packages to 4.1.12. `npm audit` reports 0 vulnerabilities.
+
+### 2026-08-12 - Dependabot group update
+
+- `eba3c38`: bumped the `npm_and_yarn` group (2 updates).
+
+### 2026-07-12 - Initial audit
+
+- `6a7d358`: `npm audit` fixes applied to the initial dependency set.

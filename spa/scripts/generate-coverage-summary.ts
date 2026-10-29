@@ -1,13 +1,22 @@
 import { readFileSync, existsSync, appendFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+interface CoverageMetric {
+  total: number;
+  covered: number;
+  pct: number;
+}
+
+interface FileCoverage {
+  statements: CoverageMetric;
+  branches: CoverageMetric;
+  functions: CoverageMetric;
+  lines: CoverageMetric;
+}
+
 interface CoverageSummary {
-  total: {
-    statements: { total: number; covered: number; pct: number };
-    branches: { total: number; covered: number; pct: number };
-    functions: { total: number; covered: number; pct: number };
-    lines: { total: number; covered: number; pct: number };
-  };
+  total: FileCoverage;
+  [key: string]: FileCoverage;
 }
 
 function loadSummary(): CoverageSummary | null {
@@ -65,7 +74,7 @@ function generateMarkdown(summary: CoverageSummary): string {
 
   const fileRows = Object.entries(fullSummary)
     .filter(([key]) => key !== 'total')
-    .map(([file, data]: [string, any]) => {
+    .map(([file, data]: [string, FileCoverage]) => {
       const relPath = file.replace(process.cwd() + '/', '');
       return `| ${relPath} | ${data.statements.pct.toFixed(0)}% | ${data.branches.pct.toFixed(0)}% | ${data.functions.pct.toFixed(0)}% | ${data.lines.pct.toFixed(0)}% |`;
     });
