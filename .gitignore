@@ -8,3 +8,4 @@ spa/dist
 spa/.env.development
 /.vscode/
 /.local-pipelines/
+bff/coverage/
