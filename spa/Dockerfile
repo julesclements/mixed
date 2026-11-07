@@ -1,5 +1,5 @@
 # Stage 1: Build the static assets for the SPA
-FROM node:24-slim AS builder
+FROM node:lts-slim AS builder
 
 WORKDIR /app/spa
 
@@ -17,7 +17,7 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Serve the static assets from the 'dist' directory
-FROM node:20-alpine AS runner
+FROM node:lts-alpine AS runner
 
 WORKDIR /app
 

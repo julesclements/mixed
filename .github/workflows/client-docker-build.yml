@@ -24,7 +24,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 'lts/*'
           cache: npm
           cache-dependency-path: client/package-lock.json
 
@@ -88,6 +88,7 @@ jobs:
           context: ./client # Context is the client directory
           file: ./client/Dockerfile # Path to the client's Dockerfile
           push: true
+          pull: true # Refresh the moving Node LTS base images
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/ping-client:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/ping-client:${{ github.sha }}

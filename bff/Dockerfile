@@ -1,5 +1,5 @@
 # 1. Base Image
-FROM node:24-slim
+FROM node:lts-slim
 
 # 2. Working Directory
 WORKDIR /usr/src/app

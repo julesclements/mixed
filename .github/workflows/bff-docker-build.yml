@@ -24,7 +24,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 'lts/*'
           cache: npm
           cache-dependency-path: bff/package-lock.json
 
@@ -88,6 +88,7 @@ jobs:
           context: ./bff # Path to the directory containing the Dockerfile and BFF code
           file: ./bff/Dockerfile # Explicit path to the Dockerfile
           push: true # Actually push the image
+          pull: true # Refresh the moving Node LTS base image
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/ping-bff:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/ping-bff:${{ github.sha }}
