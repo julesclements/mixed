@@ -69,8 +69,8 @@ run_case missing-root 0
 if grep -q 'main_mixed:' "$FIXTURE/output"; then exit 1; fi
 [[ "$(grep -c ': PASS' "$FIXTURE/output")" -eq 4 ]]
 if grep -q '^repo npm install\|^repo npm run' "$CALLS"; then exit 1; fi
-grep -q 'nvm install 26' "$CALLS"
-grep -q 'nvm use 26' "$CALLS"
+grep -q 'nvm install 26.13.0' "$CALLS"
+grep -q 'nvm use 26.13.0' "$CALLS"
 [[ "$(grep -c 'docker buildx build' "$CALLS")" -eq 3 ]]
 grep -q -- '--pull --load' "$CALLS"
 grep -q 'npx --no-install tsx' "$CALLS"

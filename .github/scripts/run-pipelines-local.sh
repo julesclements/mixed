@@ -4,15 +4,15 @@ set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 SKIP_DOCKER=false
-# Keep in sync with the Dockerfile base images and workflow node-version.
-NODE_MAJOR=26
+# Exact Node version; keep in sync with Dockerfile base images, workflow node-version and engines.
+NODE_VERSION=26.13.0
 NVM_VERSION=v0.40.3
 NVM_INSTALL_SHA256=2d8359a64a3cb07c02389ad88ceecd43f2fa469c06104f92f98df5b6f315275f
 usage() {
     cat <<EOF
 Usage: bash .github/scripts/run-pipelines-local.sh [--skip-docker] [--help]
 
-Installs NVM if missing, then installs and switches to Node.js $NODE_MAJOR (LTS).
+Installs NVM if missing, then installs and switches to Node.js $NODE_VERSION.
 Runs four application build/test checks independently; exits nonzero if any fails.
 The Azure workflow is excluded. No image delivery or runtime deployment is attempted.
 Docker builds are local only. --skip-docker enables partial npm-only checks.
@@ -76,8 +76,8 @@ setup_node() {
     fi
     # shellcheck source=/dev/null
     source "$NVM_DIR/nvm.sh" --no-use
-    nvm install "$NODE_MAJOR"
-    nvm use "$NODE_MAJOR"
+    nvm install "$NODE_VERSION"
+    nvm use "$NODE_VERSION"
     set -u
     printf 'Using Node %s, npm %s\n' "$(node --version)" "$(npm --version)"
 }
