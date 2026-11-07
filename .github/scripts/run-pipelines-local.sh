@@ -4,11 +4,15 @@ set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 SKIP_DOCKER=false
+# Keep in sync with the Dockerfile base images and workflow node-version.
+NODE_MAJOR=26
+NVM_VERSION=v0.40.3
+NVM_INSTALL_SHA256=2d8359a64a3cb07c02389ad88ceecd43f2fa469c06104f92f98df5b6f315275f
 usage() {
-    cat <<'EOF'
+    cat <<EOF
 Usage: bash .github/scripts/run-pipelines-local.sh [--skip-docker] [--help]
 
-Installs NVM if missing, then installs and switches to latest Node.js LTS.
+Installs NVM if missing, then installs and switches to Node.js $NODE_MAJOR (LTS).
 Runs four application build/test checks independently; exits nonzero if any fails.
 The Azure workflow is excluded. No image delivery or runtime deployment is attempted.
 Docker builds are local only. --skip-docker enables partial npm-only checks.
@@ -34,14 +38,33 @@ printf '# Local pipeline results\n\n' > "$GITHUB_STEP_SUMMARY"
 setup_node() {
     # NVM shell functions are not nounset-safe across all releases.
     set +u
-    export NVM_DIR="${NVM_DIR:-${XDG_CONFIG_HOME:-$HOME}/.nvm}"
+    # Match the NVM installer's own default location.
+    if [[ -z "${NVM_DIR:-}" ]]; then
+        if [[ -n "${XDG_CONFIG_HOME:-}" ]]; then
+            NVM_DIR="$XDG_CONFIG_HOME/nvm"
+        else
+            NVM_DIR="$HOME/.nvm"
+        fi
+    fi
+    export NVM_DIR
     if [[ ! -s "$NVM_DIR/nvm.sh" ]]; then
         command -v curl >/dev/null || { echo 'curl is required to install NVM.' >&2; return 1; }
         local installer
         installer="$(mktemp)"
-        # Pin NVM's installer, but dynamically resolve latest Node LTS.
+        # Pin NVM's installer by tag and verify its content before running it.
         if ! curl --fail --silent --show-error --location \
-            https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh -o "$installer"; then
+            "https://raw.githubusercontent.com/nvm-sh/nvm/$NVM_VERSION/install.sh" -o "$installer"; then
+            rm -f -- "$installer"
+            return 1
+        fi
+        local actual
+        if command -v sha256sum >/dev/null; then
+            actual="$(sha256sum -- "$installer" | cut -d' ' -f1)"
+        else
+            actual="$(shasum -a 256 -- "$installer" | cut -d' ' -f1)"
+        fi
+        if [[ "$actual" != "$NVM_INSTALL_SHA256" ]]; then
+            echo "NVM installer checksum mismatch (got $actual)." >&2
             rm -f -- "$installer"
             return 1
         fi
@@ -53,8 +76,8 @@ setup_node() {
     fi
     # shellcheck source=/dev/null
     source "$NVM_DIR/nvm.sh" --no-use
-    nvm install --lts
-    nvm use --lts
+    nvm install "$NODE_MAJOR"
+    nvm use "$NODE_MAJOR"
     set -u
     printf 'Using Node %s, npm %s\n' "$(node --version)" "$(npm --version)"
 }
@@ -69,7 +92,8 @@ install_dependencies() {
 }
 
 save_coverage() {
-    # Match always() artifact steps, including reports already on disk on failure.
+    # Match always() artifact steps. Stale reports are removed before each run,
+    # so anything here was produced by this run (possibly partial on failure).
     if [[ -d coverage ]]; then
         mkdir -p -- "$RESULTS/$PIPELINE"
         cp -R coverage "$RESULTS/$PIPELINE/"
@@ -108,6 +132,7 @@ build_image() {
 docker_pipeline() {
     local service="$1"
     cd -- "$ROOT/$service"
+    rm -rf -- coverage
     trap 'save_coverage' EXIT
     install_dependencies
     if [[ "$service" == spa ]]; then
@@ -125,6 +150,7 @@ docker_pipeline() {
 
 pages_pipeline() {
     cd -- "$ROOT/client"
+    rm -rf -- coverage
     trap 'save_coverage' EXIT
     install_dependencies
     npm run test:coverage

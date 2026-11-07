@@ -21,7 +21,7 @@ jobs:
       - name: Set up Node.js version
         uses: actions/setup-node@v3
         with:
-          node-version: 'lts/*'
+          node-version: '26'
 
       - name: npm install, build, and test
         run: |
@@ -62,4 +62,4 @@ jobs:
           app-name: 'mixed'
           slot-name: 'Production'
           package: .
-          
+          

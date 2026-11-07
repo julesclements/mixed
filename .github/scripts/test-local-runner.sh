@@ -69,8 +69,8 @@ run_case missing-root 0
 if grep -q 'main_mixed:' "$FIXTURE/output"; then exit 1; fi
 [[ "$(grep -c ': PASS' "$FIXTURE/output")" -eq 4 ]]
 if grep -q '^repo npm install\|^repo npm run' "$CALLS"; then exit 1; fi
-grep -q 'nvm install --lts' "$CALLS"
-grep -q 'nvm use --lts' "$CALLS"
+grep -q 'nvm install 26' "$CALLS"
+grep -q 'nvm use 26' "$CALLS"
 [[ "$(grep -c 'docker buildx build' "$CALLS")" -eq 3 ]]
 grep -q -- '--pull --load' "$CALLS"
 grep -q 'npx --no-install tsx' "$CALLS"
@@ -80,8 +80,12 @@ run_case all-pass 0
 if grep -q '^repo npm install\|^repo npm run' "$CALLS"; then exit 1; fi
 grep -q 'WARNING: SPA audit failed' "$FIXTURE/output"
 [[ -s "$LOCAL_PIPELINES_RESULTS_DIR/client-deploy/docs/index.html" ]]
+mkdir -p "$FIXTURE/repo/bff/coverage"
+printf '{}\n' > "$FIXTURE/repo/bff/coverage/coverage-summary.json"
 export FAIL_BFF=true
 run_case failed-test 1
+[[ ! -e "$FIXTURE/repo/bff/coverage" ]]
+[[ ! -e "$LOCAL_PIPELINES_RESULTS_DIR/bff-docker-build/coverage" ]]
 grep -q 'bff-docker-build: FAIL (pipeline exit 42' "$FIXTURE/output"
 if grep -q 'docker buildx build.*ping-bff' "$CALLS"; then exit 1; fi
 grep -q 'client-deploy: PASS' "$FIXTURE/output"
