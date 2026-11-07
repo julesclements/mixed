@@ -87,3 +87,46 @@ It uses `express-session` for session management and `openid-client` for OIDC in
         *   In production mode (`NODE_ENV=production`), `app.set('trust proxy', 1);` is enabled.
         *   This setting is crucial if you deploy the BFF behind a reverse proxy (e.g., Nginx, AWS ELB/ALB) that terminates TLS (handles HTTPS) and forwards requests to the BFF over HTTP.
         *   It allows Express to correctly determine that the connection was originally secure, which is essential for the `secure: true` cookie attribute to work as intended. Without it, Express might think the connection is insecure (HTTP) and refuse to set the secure cookie.
+
+## Appendix: Security Remediation History
+
+Newest entries first. Add an entry whenever a vulnerability is assessed or remediated.
+
+### Runtime requirement
+
+The BFF is the only component in this repository that runs on Node.js in
+production, so it is the one directly exposed to Node runtime vulnerabilities.
+Node.js is pinned to exactly `26.13.0`: the `Dockerfile` uses
+`node:26.13.0-slim`, CI uses `node-version: '26.13.0'`, and `package.json`
+declares `engines.node >=26.13.0`. `engines` is advisory because the repository
+has no `.npmrc` with `engine-strict=true`. Raise all of these together, following
+the upgrade checklist in the
+[local-pipelines skill](../.github/skills/local-pipelines/SKILL.md).
+
+### 2026-10 - Node.js October 2026 security releases
+
+Reference: <https://nodejs.org/en/blog/vulnerability/october-2026-security-releases>.
+Assessed against the advisory summary only. CVE details were not independently
+verified. All four CVEs are fixed in Node.js 26.12.1 and later, so the pinned
+26.13.0 includes the fixes.
+
+| CVE | Summary | Exposure in this project |
+| --- | --- | --- |
+| CVE-2026-111497 | Brotli decoder out-of-bounds write (RCE) | Not reachable on known paths. `express.json()` (body-parser 1.x) accepts only `gzip`/`deflate`/`identity` request bodies. `openid-client` 5.7.1 sends `Accept-Encoding: identity` and never decompresses. `jose` JWKS fetching was not inspected. |
+| CVE-2026-105483 | TLS hostname bypass with fullwidth-digit IPs | Runtime-level; outbound HTTPS to the OIDC issuer. Mitigated by the Node upgrade. |
+| CVE-2026-106069 | TLS hostname bypass when host loosely resolves to an IP | Runtime-level; outbound HTTPS to the OIDC issuer. Mitigated by the Node upgrade. |
+| CVE-2026-105482 | `dns.resolve` truncates names containing NUL | Low; the app does not call `dns.resolve` or resolve user-supplied hostnames. |
+
+Actions taken:
+
+- Moved the Docker base image, CI and the local runner from Node 24 to Node 26,
+  then pinned the exact version `26.13.0`.
+- Declared `engines.node >=26.13.0`.
+- `ALLOW_SELF_SIGNED_CERTS=true` disables certificate validation and overrides
+  any TLS fix. It must never be set in production.
+
+### 2026-10 - Dependency CVE remediation
+
+- Locked express 4.22.2 to 4.22.3 and vitest and coverage packages 4.1.10 to
+  4.1.12. `npm audit` reports 0 vulnerabilities.
+- Docker builds install from the committed lockfile with `npm ci --omit=dev`.

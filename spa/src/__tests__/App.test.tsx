@@ -246,7 +246,7 @@ describe('App - Check token (BFF)', () => {
       status: 200,
       json: async () => ({ valid: true, user: 'test' }),
     });
-    vi.spyOn(globalThis, 'fetch').mockImplementation(fetchMock as any);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetchMock as unknown as typeof fetch);
 
     const user = userEvent.setup();
     mockLocation.search = '?code=check-code';
@@ -284,7 +284,7 @@ describe('App - Check token (BFF)', () => {
       status: 401,
       json: async () => ({ error: 'invalid_token' }),
     });
-    vi.spyOn(globalThis, 'fetch').mockImplementation(fetchMock as any);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetchMock as unknown as typeof fetch);
 
     const user = userEvent.setup();
     mockLocation.search = '?code=check-bad-code';

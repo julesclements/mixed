@@ -32,7 +32,7 @@ describe('resolveTokenEndpoint', () => {
 
   it('throws error if pingBaseUrl is falsy/undefined', () => {
     expect(() => resolveTokenEndpoint('')).toThrow('pingBaseUrl is required');
-    expect(() => resolveTokenEndpoint(undefined as any)).toThrow('pingBaseUrl is required');
+    expect(() => resolveTokenEndpoint(undefined as unknown as string)).toThrow('pingBaseUrl is required');
   });
 });
 
@@ -56,7 +56,7 @@ describe('resolveAuthEndpoint', () => {
 
   it('throws error if pingBaseUrl is falsy/undefined', () => {
     expect(() => resolveAuthEndpoint('')).toThrow('pingBaseUrl is required');
-    expect(() => resolveAuthEndpoint(undefined as any)).toThrow('pingBaseUrl is required');
+    expect(() => resolveAuthEndpoint(undefined as unknown as string)).toThrow('pingBaseUrl is required');
   });
 });
 
@@ -75,7 +75,7 @@ describe('resolveLogoffEndpoint', () => {
 
   it('throws error if pingBaseUrl is falsy/undefined', () => {
     expect(() => resolveLogoffEndpoint('')).toThrow('pingBaseUrl is required');
-    expect(() => resolveLogoffEndpoint(undefined as any)).toThrow('pingBaseUrl is required');
+    expect(() => resolveLogoffEndpoint(undefined as unknown as string)).toThrow('pingBaseUrl is required');
   });
 });
 
@@ -89,7 +89,7 @@ describe('exchangeCodeForToken', () => {
         token_type: 'Bearer',
         expires_in: 3600,
       }),
-    }) as any;
+    }) as unknown as typeof fetch;
 
     const result = await exchangeCodeForToken(
       'code123',
@@ -119,14 +119,14 @@ describe('exchangeCodeForToken', () => {
   });
 
   it('throws when response is not ok', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({ ok: false, status: 400 }) as any;
+    const mockFetch = vi.fn().mockResolvedValue({ ok: false, status: 400 }) as unknown as typeof fetch;
     await expect(
       exchangeCodeForToken('c', 'v', 'cli', 'https://spa/cb', 'https://tok', mockFetch),
     ).rejects.toThrow('Failed to exchange code for token');
   });
 
   it('rethrows non-HTTP errors from fetch implementation', async () => {
-    const mockFetch = vi.fn().mockRejectedValue(new TypeError('network failure')) as any;
+    const mockFetch = vi.fn().mockRejectedValue(new TypeError('network failure')) as unknown as typeof fetch;
     await expect(
       exchangeCodeForToken('c', 'v', 'cli', 'https://spa/cb', 'https://tok', mockFetch),
     ).rejects.toThrow('network failure');
