@@ -24,6 +24,9 @@ WORKDIR /app
 # Install 'serve' to serve static files
 RUN npm install -g serve@14.2.7
 
+# Disable serve's npm registry update check so the container makes no outbound requests
+ENV NO_UPDATE_CHECK=1
+
 # Copy the built assets from the builder stage
 COPY --from=builder /app/client/docs ./docs
 
