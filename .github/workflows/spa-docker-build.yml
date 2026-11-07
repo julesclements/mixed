@@ -24,7 +24,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: '26'
           cache: npm
           cache-dependency-path: spa/package-lock.json
 
@@ -73,6 +73,7 @@ jobs:
           context: ./spa # Context is the spa directory
           file: ./spa/Dockerfile # Path to the spa's Dockerfile
           push: true
+          pull: true # Refresh Node 26 base image patch releases
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/ping-spa:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/ping-spa:${{ github.sha }}
