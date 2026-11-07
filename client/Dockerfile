@@ -3,11 +3,11 @@ FROM node:lts-slim AS builder
 
 WORKDIR /app/client
 
-# Copy package.json and package-lock.json (if available)
-COPY package*.json ./
+# Copy the manifest and patched lockfile
+COPY package.json package-lock.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm ci
 
 # Copy the rest of the client application source code
 COPY . .

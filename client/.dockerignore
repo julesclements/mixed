@@ -1,0 +1,9 @@
+node_modules
+coverage
+docs
+.parcel-cache
+.env
+.env.*
+.git
+.github
+*.log
