@@ -1,5 +1,5 @@
 # Stage 1: Build the static assets
-FROM node:lts-slim AS builder
+FROM node:26-slim AS builder
 
 WORKDIR /app/client
 
@@ -17,12 +17,12 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Serve the static assets from the 'docs' directory
-FROM node:lts-alpine AS runner
+FROM node:26-alpine AS runner
 
 WORKDIR /app
 
 # Install 'serve' to serve static files
-RUN npm install -g serve
+RUN npm install -g serve@14.2.7
 
 # Copy the built assets from the builder stage
 COPY --from=builder /app/client/docs ./docs

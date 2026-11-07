@@ -9,3 +9,4 @@ spa/.env.development
 /.vscode/
 /.local-pipelines/
 bff/coverage/
+client/coverage/
