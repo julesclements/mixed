@@ -45,6 +45,9 @@ function App() {
 
     if (error) {
       const clientId = sessionStorage.getItem('auth_client_id');
+      // One-time sync from the OAuth callback URL on mount; it cannot be derived during render
+      // because the URL is cleaned with replaceState below.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOAuthError({
         error,
         description: error_description || undefined,

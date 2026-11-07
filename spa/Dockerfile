@@ -1,5 +1,5 @@
 # Stage 1: Build the static assets for the SPA
-FROM node:26-slim AS builder
+FROM node:26.13.0-slim AS builder
 
 WORKDIR /app/spa
 
@@ -23,7 +23,7 @@ ENV VITE_STAFF_CLIENT_ID=$VITE_STAFF_CLIENT_ID \
 RUN npm run build
 
 # Stage 2: Serve the static assets from the 'dist' directory
-FROM node:26-alpine AS runner
+FROM node:26.13.0-alpine AS runner
 
 WORKDIR /app
 
