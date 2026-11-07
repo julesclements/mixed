@@ -105,10 +105,13 @@ the upgrade checklist in the
 
 ### 2026-10 - Node.js October 2026 security releases
 
-Reference: <https://nodejs.org/en/blog/vulnerability/october-2026-security-releases>.
-Assessed against the advisory summary only. CVE details were not independently
-verified. All four CVEs are fixed in Node.js 26.12.1 and later, so the pinned
-26.13.0 includes the fixes.
+Reference: <https://nodejs.org/en/blog/vulnerability/october-2026-security-releases>
+(published 2026-10-21). The advisory lists ten CVEs. The fixed releases are
+22.23.4, 24.22.1 and 26.12.1, so the pinned 26.13.0 includes every fix. The
+advisory does not map individual CVEs to fixed versions, and CVE details beyond
+the advisory were not independently verified.
+
+The first four are rated High.
 
 | CVE | Summary | Exposure in this project |
 | --- | --- | --- |
@@ -116,6 +119,12 @@ verified. All four CVEs are fixed in Node.js 26.12.1 and later, so the pinned
 | CVE-2026-105483 | TLS hostname bypass with fullwidth-digit IPs | Runtime-level; outbound HTTPS to the OIDC issuer. Mitigated by the Node upgrade. |
 | CVE-2026-106069 | TLS hostname bypass when host loosely resolves to an IP | Runtime-level; outbound HTTPS to the OIDC issuer. Mitigated by the Node upgrade. |
 | CVE-2026-105482 | `dns.resolve` truncates names containing NUL | Low; the app does not call `dns.resolve` or resolve user-supplied hostnames. |
+| CVE-2026-106072 (Medium) | DNS SANs accepted for non-canonical IPv4 hostnames | Runtime-level; outbound HTTPS to the OIDC issuer. Only relevant if the issuer is configured as an IP address. Mitigated by the Node upgrade. |
+| CVE-2026-105481 (Medium) | Keep-alive socket processes a response written before the request | Runtime-level; outbound HTTP requests to the OIDC issuer can reuse keep-alive sockets. Mitigated by the Node upgrade. |
+| CVE-2026-106074 (Medium) | `randomUUID()`/`randomInt()` entropy cached in startup snapshots and SEAs | No; the BFF is not built as a startup snapshot or single executable application. |
+| CVE-2026-106070 (Low) | `ZipFile` returns prefix bytes after failed header validation | No; no ZIP handling. |
+| CVE-2026-106071 (Low) | Permission Model filesystem over-grant | No; the Permission Model (`--permission`) is not used. |
+| CVE-2026-106073 (Low) | Permission Model bypass with `fs.realpathSync` | No; the Permission Model is not used. |
 
 Actions taken:
 

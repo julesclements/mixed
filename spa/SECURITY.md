@@ -3,33 +3,55 @@
 ## Node.js October 2026 Security Releases
 
 Reference: <https://nodejs.org/en/blog/vulnerability/october-2026-security-releases>
+(published 2026-10-21). The advisory lists ten CVEs across the 22.x, 24.x and
+26.x lines. The fixed releases are 22.23.4, 24.22.1 and 26.12.1. The advisory
+does not map individual CVEs to fixed versions.
 
-### Exposure summary
+### Where Node.js runs
 
-This is a browser-only SPA built with Vite and deployed as static files (Netlify). Node.js is used only for local development, build, tests and CI. No application code runs on Node in production.
+- **Build, test and CI:** Vite, Vitest, TypeScript and ESLint run on Node.js.
+- **Production:** `.github/workflows/spa-docker-build.yml` publishes the
+  `ping-spa` Docker image. Its runtime stage runs the `serve` static file server
+  on Node.js (`node:26.13.0-alpine`). The React application itself runs in the
+  browser and uses the browser's `fetch`, TLS and decompression, not Node's.
 
-Reviewed: `src/`, `scripts/`, `package.json`, `netlify.toml`, `.github/workflows/test-coverage.yml`.
+`serve` 14.2.7 handles inbound HTTP `GET` requests for static files. It does not
+decode request bodies, and its `compression` dependency only *compresses*
+responses (Brotli, gzip). On startup it also checks the npm registry for updates
+over HTTPS. The image sets `NO_UPDATE_CHECK=1`, so the container makes no
+outbound requests.
 
-| CVE | Issue | Affects | Exposed? | Reason |
+Reviewed: `src/`, `scripts/`, `package.json`, `Dockerfile`,
+`.github/workflows/spa-docker-build.yml` and the `serve` 14.2.7 package.
+
+### Exposure assessment
+
+| CVE | Severity | Issue | Exposed? | Reason |
 | --- | --- | --- | --- | --- |
-| CVE-2026-111497 | Brotli decoder out-of-bounds write (RCE) | Node 22.x, 24.x, 26.x | No (toolchain only, not reachable) | No use of `node:zlib` or Brotli in `src/` or `scripts/`. The only `node:` imports are `node:fs` and `node:path` in `scripts/generate-coverage-summary.ts`. The app has no Node server that accepts Brotli request bodies or fetches Brotli responses. Browser `fetch()` calls (`src/App.tsx`, `src/lib/tokenExchange.ts`) use the browser's decoder, not Node's. |
-| CVE-2026-105483 | TLS hostname bypass (fullwidth-digit IP) | Node 24.x, 26.x | No | No Node-side TLS client code. Browser requests use the browser's TLS stack. |
-| CVE-2026-106069 | TLS hostname bypass (non-canonical IPv4 literal) | Node 22.x, 24.x, 26.x | No | Same as above. Tooling connects to named hosts (npm registry, GitHub), not IP literals. |
-| CVE-2026-105482 | `dns.resolve*()` truncates names containing NUL | Node 22.x, 24.x, 26.x | No | No use of `dns` or `dns.resolve*()`. |
+| CVE-2026-111497 | High | Brotli decoder out-of-bounds write (RCE) | No | Neither `serve` nor the build tooling decodes untrusted Brotli input. `serve` only encodes responses. The only `node:` imports in project code are `node:fs` and `node:path` in `scripts/generate-coverage-summary.ts`. |
+| CVE-2026-105483 | High | TLS hostname bypass (fullwidth-digit IP) | No | The production container makes no outbound TLS connections (`NO_UPDATE_CHECK=1`). Build tooling connects to named hosts (npm registry, GitHub), not IP literals. |
+| CVE-2026-106069 | High | TLS hostname bypass (host loosely resolves to an IP) | No | Same as above. |
+| CVE-2026-106072 | Medium | DNS SANs accepted for non-canonical IPv4 hostnames | No | Same as above. |
+| CVE-2026-105482 | High | `dns.resolve*()` truncates names containing NUL | No | No use of `dns.resolve*()`. |
+| CVE-2026-105481 | Medium | Keep-alive socket processes a response written before the request | No | No outbound Node HTTP client in production. |
+| CVE-2026-106074 | Medium | `randomUUID()`/`randomInt()` entropy cached in startup snapshots and SEAs | No | No startup snapshots or single executable applications. `crypto.randomUUID()` in `src/App.tsx` is the browser's Web Crypto API. |
+| CVE-2026-106070 | Low | `ZipFile` returns prefix bytes after failed header validation | No | No ZIP handling. |
+| CVE-2026-106071 | Low | Permission Model filesystem over-grant | No | The Permission Model (`--permission`) is not used. |
+| CVE-2026-106073 | Low | Permission Model bypass with `fs.realpathSync` | No | Same as above. |
 
-### Pre-branch state (`main`)
+Before this change, the build and CI used Node 24, and the runtime image used
+`node:20-alpine`. Node 20 is end-of-life and the advisory says end-of-life
+versions are affected and receive no fix. None of the vulnerable code paths
+above are used, so this was a latent exposure rather than an exploitable one.
 
-`main` did not pin a patched Node.js version. `package.json` had no `engines` field, the README said "Node.js v14 or higher", and CI used `node-version: 24`. Developer machines and CI could therefore run an affected Node build. This was a latent toolchain exposure only. None of the vulnerable code paths above are used by this project.
+### Mitigation
 
-### Mitigation on this branch
+Node.js is pinned to exactly `26.13.0`, which includes all of the fixes:
 
-All four CVEs are fixed in Node.js 26.12.1 (also 24.22.1 and 22.23.4).
+- `Dockerfile` uses `node:26.13.0-slim` (build) and `node:26.13.0-alpine` (runtime).
+- CI uses `node-version: '26.13.0'`.
+- `package.json` declares `engines.node >=26.13.0`. This is advisory, because
+  the repository has no `.npmrc` with `engine-strict=true`.
 
-- `package.json` `engines.node` is `>=26.12.1`.
-- `.nvmrc` pins `26.12.1`.
-- CI (`.github/workflows/test-coverage.yml`) uses Node `26.12.1`.
-
-Notes:
-
-- `engines` is advisory unless `engine-strict=true` is set in `.npmrc`. The repo has no `.npmrc`.
-- `netlify.toml` does not set `NODE_VERSION`. Netlify builds rely on `.nvmrc`.
+To change the Node version, follow the upgrade checklist in the
+[local-pipelines skill](../.github/skills/local-pipelines/SKILL.md).
