@@ -1,5 +1,8 @@
 # Local pipeline checks
 
+Repository-specific agent guidance and learned maintenance rules live in the
+[local-pipelines skill](../skills/local-pipelines/SKILL.md).
+
 Run `bash .github/scripts/run-pipelines-local.sh` from the repository root, or
 invoke the script by absolute path from any directory. Use `--skip-docker` for
 explicitly partial npm-only checks, or `--help` for usage without side effects.
@@ -51,3 +54,19 @@ Keep this runner in sync when workflow commands change.
 
 Run `bash .github/scripts/test-local-runner.sh` for offline control-flow tests
 using an isolated temporary repository and mocked NVM/npm/Docker commands.
+
+## Dependency warning maintenance
+
+Dependency manifests and lockfiles include compatible security patches. Keep
+the lockfiles committed: Docker builds now use `npm ci`, not floating installs.
+Each Docker context excludes host dependencies, coverage, build output, and env
+files, so container dependencies cannot be overwritten by a local installation.
+
+Client and SPA manifests explicitly approve the reviewed native-build scripts
+using version-pinned `allowScripts` entries. When those packages change, review
+their scripts again and update the pins; do not approve all packages globally.
+Browserslist data was refreshed in the lockfiles rather than hiding stale-data
+warnings. The BFF test config uses an explicit ESM extension for native loading.
+
+npm's messages about funding or a newer npm major version are informational,
+not build warnings. The runner intentionally retains npm bundled with Node LTS.
