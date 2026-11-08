@@ -107,6 +107,7 @@ The client application can be deployed in two ways:
         *   `DOCKERHUB_USERNAME`: Your Docker Hub username.
         *   `DOCKERHUB_TOKEN`: A Docker Hub access token with write permissions.
     *   The image will be tagged as `yourdockerhubusername/ping-bff:latest` (replace `yourdockerhubusername` with your actual Docker Hub username, or modify the tag in the workflow).
+*   **Azure App Service:** `.github/workflows/main_mixed.yml` builds and tests the BFF from `bff/` on every push to `main`, then deploys it as a Node.js app to the Azure Web App `mixed`. Set the BFF's environment variables as App Service application settings. App Service provides `PORT`, which the BFF uses instead of `BFF_PORT`.
 *   **You are responsible for deploying the BFF Docker image** from Docker Hub to your preferred hosting environment (e.g., a cloud provider like AWS, Google Cloud, Azure, or any server that can run Docker containers). You will also need to manage the `.env` variables for your deployed BFF instance.
 *   **Reverse Proxy (Recommended for Production BFF):** When deploying the BFF, it's highly recommended to place it behind a reverse proxy (like Nginx or an Application Load Balancer). The reverse proxy can handle:
     *   **HTTPS termination:** Ensuring your BFF is served over HTTPS.

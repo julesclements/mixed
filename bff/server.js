@@ -23,7 +23,8 @@ const {
 const app = express(); // Define app instance at a higher scope
 let oidcClient; // Define oidcClient at a higher scope
 let JWKS; // Global JWKS set for token validation
-const port = process.env.BFF_PORT || 3001;
+// Hosting platforms such as Azure App Service assign the listening port via PORT.
+const port = process.env.PORT || process.env.BFF_PORT || 3001;
 const pingIssuerUrl = process.env.PING_ISSUER_URL;
 const pingBrowserFacingBaseUrl = process.env.PING_BROWSER_FACING_BASE_URL || ""; // Read new env var
 const clientId = process.env.PING_CLIENT_ID;

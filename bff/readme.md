@@ -22,7 +22,7 @@ It uses `express-session` for session management and `openid-client` for OIDC in
     *   `PING_CLIENT_SECRET`: The client secret for your BFF application.
     *   `PING_ISSUER_URL`: The issuer URI of your PingFederate server (e.g., `https://ping.hdc.company` or `https://localhost:9031`). The library will use this to discover OIDC endpoints.
     *   `SESSION_SECRET`: A long, random, and secure string used to sign the session ID cookie. Generate a strong one.
-    *   `BFF_PORT`: The port on which the BFF server will listen (default is `3001`).
+    *   `BFF_PORT`: The port on which the BFF server will listen (default is `3001`). If the hosting platform sets `PORT` (Azure App Service does), `PORT` takes precedence.
     *   `FRONTEND_ORIGIN`: **Crucial for CORS configuration.** This **MUST be the exact *origin*** (or a comma-separated list of origins) of your client application(s), used for the BFF's `Access-Control-Allow-Origin` header.
         *   An origin is defined by its scheme (e.g., `http` or `https`), hostname (e.g., `localhost`, `julesclements.github.io`), and port (if it's not the default for the scheme, e.g., `:1234`).
         *   **DO NOT include paths or trailing slashes.**
