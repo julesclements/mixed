@@ -16,7 +16,7 @@ A minimal Node.js application that demonstrates authentication with PingFederate
 
 ## Prerequisites
 
-- Node.js (v14 or higher)
+- Node.js 26.13.0 (pinned; see `engines` in `package.json`)
 - A PingFederate server
 - A registered application in PingFederate with proper redirect URIs
 

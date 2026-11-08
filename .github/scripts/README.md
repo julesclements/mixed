@@ -8,27 +8,30 @@ invoke the script by absolute path from any directory. Use `--skip-docker` for
 explicitly partial npm-only checks, or `--help` for usage without side effects.
 
 The runner installs NVM v0.40.3 if missing (verifying the installer's SHA-256
-before running it), then installs/uses **Node.js 26 (LTS)** via `nvm install 26`
-and `nvm use 26`. It respects `NVM_DIR` and otherwise uses NVM's own default
+before running it), then installs/uses **Node.js 26.13.0** via
+`nvm install 26.13.0` and `nvm use 26.13.0`. It respects `NVM_DIR` and otherwise uses NVM's own default
 (`$XDG_CONFIG_HOME/nvm` or `~/.nvm`). It does not edit shell profiles, and only
 switches Node within the script process (the calling terminal is unchanged).
 NVM may create a default alias on first install.
 
-The Node major is pinned everywhere: workflows use `node-version: '26'` and
-Docker stages use `node:26-slim` and `node:26-alpine`. Patch releases are still
-picked up via `--pull`, but moving to a new major is a deliberate change: update
-`NODE_MAJOR` in the runner, the workflows, and all three Dockerfiles together
-(see the upgrade checklist in the [local-pipelines skill](../skills/local-pipelines/SKILL.md)).
+Node is pinned to the exact version the software is built and tested on,
+everywhere: `NODE_VERSION` in the runner, `node-version: '26.13.0'` in the
+workflows, `node:26.13.0-slim` and `node:26.13.0-alpine` in the Dockerfiles, and
+`engines.node` (`>=26.13.0`) in the BFF and SPA manifests. Any Node change,
+including a patch release, is a deliberate commit that updates all of them
+together (see the upgrade checklist in the
+[local-pipelines skill](../skills/local-pipelines/SKILL.md)).
 The runtime `serve` package is also version-pinned in the client and SPA images.
 
 Prerequisites: Bash, curl when installing NVM, and Docker with a running daemon
 and Buildx. Internet access is required for Node/npm and base-image downloads.
-No cloud credentials are needed. Docker builds use `--pull` to refresh Node 26 patch images.
+No cloud credentials are needed. Docker builds use `--pull` to pick up rebuilds of the pinned `26.13.0` image tags
+(for example OS package fixes); the Node version itself never changes.
 
 Only the four application build/test checks below run locally. The Azure workflow
 is excluded entirely; no root npm job, image delivery, or Azure runtime is attempted.
 The GitHub-hosted workflows are not run locally, but they share the pinned Node
-major: all five pin `node-version: '26'`, and the Docker build workflows refresh
+version: all five pin `node-version: '26.13.0'`, and the Docker build workflows refresh
 base images with `pull: true`.
 
 | Workflow | Local checks |

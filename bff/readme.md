@@ -87,3 +87,60 @@ It uses `express-session` for session management and `openid-client` for OIDC in
         *   In production mode (`NODE_ENV=production`), `app.set('trust proxy', 1);` is enabled.
         *   This setting is crucial if you deploy the BFF behind a reverse proxy (e.g., Nginx, AWS ELB/ALB) that terminates TLS (handles HTTPS) and forwards requests to the BFF over HTTP.
         *   It allows Express to correctly determine that the connection was originally secure, which is essential for the `secure: true` cookie attribute to work as intended. Without it, Express might think the connection is insecure (HTTP) and refuse to set the secure cookie.
+
+## Appendix: Security Remediation History
+
+Newest entries first. Add an entry whenever a vulnerability is assessed or remediated.
+
+### Runtime requirement
+
+Three production images run on Node.js: the BFF (`node:26.13.0-slim`) and the
+client and SPA static servers, which run `serve` on `node:26.13.0-alpine`. The
+BFF is the only one that runs this project's own server code and makes outbound
+requests (to the OIDC issuer), so it has the widest exposure to Node runtime
+vulnerabilities. The `serve` images are assessed in
+[client/security.md](../client/security.md) and [spa/SECURITY.md](../spa/SECURITY.md).
+
+The BFF pins Node.js to exactly `26.13.0`: the `Dockerfile` uses
+`node:26.13.0-slim`, CI uses `node-version: '26.13.0'`, and `package.json`
+declares `engines.node >=26.13.0`. `engines` is advisory because the repository
+has no `.npmrc` with `engine-strict=true`. Raise all of these together, following
+the upgrade checklist in the
+[local-pipelines skill](../.github/skills/local-pipelines/SKILL.md).
+
+### 2026-10 - Node.js October 2026 security releases
+
+Reference: <https://nodejs.org/en/blog/vulnerability/october-2026-security-releases>
+(published 2026-10-21). The advisory lists ten CVEs. The fixed releases are
+22.23.4, 24.22.1 and 26.12.1, so the pinned 26.13.0 includes every fix. The
+advisory does not map individual CVEs to fixed versions, and CVE details beyond
+the advisory were not independently verified.
+
+The first four are rated High.
+
+| CVE | Summary | Exposure in this project |
+| --- | --- | --- |
+| CVE-2026-111497 | Brotli decoder out-of-bounds write (RCE) | Not reachable on known paths. `express.json()` (body-parser 1.x) accepts only `gzip`/`deflate`/`identity` request bodies. `openid-client` 5.7.1 sends `Accept-Encoding: identity` and never decompresses. `jose` JWKS fetching was not inspected. |
+| CVE-2026-105483 | TLS hostname bypass with fullwidth-digit IPs | Runtime-level; outbound HTTPS to the OIDC issuer. Mitigated by the Node upgrade. |
+| CVE-2026-106069 | TLS hostname bypass when host loosely resolves to an IP | Runtime-level; outbound HTTPS to the OIDC issuer. Mitigated by the Node upgrade. |
+| CVE-2026-105482 | `dns.resolve` truncates names containing NUL | Low; the app does not call `dns.resolve` or resolve user-supplied hostnames. |
+| CVE-2026-106072 (Medium) | DNS SANs accepted for non-canonical IPv4 hostnames | Runtime-level; outbound HTTPS to the OIDC issuer. Only relevant if the issuer is configured as an IP address. Mitigated by the Node upgrade. |
+| CVE-2026-105481 (Medium) | Keep-alive socket processes a response written before the request | Runtime-level; outbound HTTP requests to the OIDC issuer can reuse keep-alive sockets. Mitigated by the Node upgrade. |
+| CVE-2026-106074 (Medium) | `randomUUID()`/`randomInt()` entropy cached in startup snapshots and SEAs | No; the BFF is not built as a startup snapshot or single executable application. |
+| CVE-2026-106070 (Low) | `ZipFile` returns prefix bytes after failed header validation | No; no ZIP handling. |
+| CVE-2026-106071 (Low) | Permission Model filesystem over-grant | No; the Permission Model (`--permission`) is not used. |
+| CVE-2026-106073 (Low) | Permission Model bypass with `fs.realpathSync` | No; the Permission Model is not used. |
+
+Actions taken:
+
+- Moved the Docker base image, CI and the local runner from Node 24 to Node 26,
+  then pinned the exact version `26.13.0`.
+- Declared `engines.node >=26.13.0`.
+- `ALLOW_SELF_SIGNED_CERTS=true` disables certificate validation and overrides
+  any TLS fix. It must never be set in production.
+
+### 2026-10 - Dependency CVE remediation
+
+- Locked express 4.22.2 to 4.22.3 and vitest and coverage packages 4.1.10 to
+  4.1.12. `npm audit` reports 0 vulnerabilities.
+- Docker builds install from the committed lockfile with `npm ci --omit=dev`.
