@@ -94,9 +94,14 @@ Newest entries first. Add an entry whenever a vulnerability is assessed or remed
 
 ### Runtime requirement
 
-The BFF is the only component in this repository that runs on Node.js in
-production, so it is the one directly exposed to Node runtime vulnerabilities.
-Node.js is pinned to exactly `26.13.0`: the `Dockerfile` uses
+Three production images run on Node.js: the BFF (`node:26.13.0-slim`) and the
+client and SPA static servers, which run `serve` on `node:26.13.0-alpine`. The
+BFF is the only one that runs this project's own server code and makes outbound
+requests (to the OIDC issuer), so it has the widest exposure to Node runtime
+vulnerabilities. The `serve` images are assessed in
+[client/security.md](../client/security.md) and [spa/SECURITY.md](../spa/SECURITY.md).
+
+The BFF pins Node.js to exactly `26.13.0`: the `Dockerfile` uses
 `node:26.13.0-slim`, CI uses `node-version: '26.13.0'`, and `package.json`
 declares `engines.node >=26.13.0`. `engines` is advisory because the repository
 has no `.npmrc` with `engine-strict=true`. Raise all of these together, following
