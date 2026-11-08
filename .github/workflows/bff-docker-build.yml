@@ -12,7 +12,7 @@ on:
 jobs:
   test:
     name: Run tests with coverage
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     defaults:
       run:
         working-directory: bff   # <-- applies to all `run:` steps in this job
@@ -60,30 +60,30 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: coverage-report
-          path: coverage/
+          path: bff/coverage/
           retention-days: 14
 
   build-and-push: # Job name specific to client
     needs: test        # <-- waits for the test job to finish and succeed
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read # Needed to checkout the code
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./bff # Path to the directory containing the Dockerfile and BFF code
           file: ./bff/Dockerfile # Explicit path to the Dockerfile
